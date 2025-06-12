@@ -65,3 +65,6 @@ Desktop.ini
 # (Optionnel) lock files si tu veux les ignorer (sinon retire ces lignes !)
 # package-lock.json
 # yarn.lock
+
+# Fichier de connexion base de données à ignorer
+backend/src/services/db.ts

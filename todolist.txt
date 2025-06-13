@@ -1,0 +1,4 @@
+map avec les capteurs
+les capteur en bdd + CRUD 
+data des capteur en bdd
+stocker les alertes en bdd

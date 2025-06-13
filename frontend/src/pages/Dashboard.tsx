@@ -2,6 +2,12 @@ import React, { useState, useEffect } from 'react';
 import Navbar from "../components/Navbar";
 import { isLoggedIn, removeToken, getUserFromToken } from "../services/auth";
 import { useNavigate } from "react-router-dom";
+import {
+  getSensors,
+  createSensor,
+  updateSensor,
+  deleteSensor
+} from "../services/sensor";
 
 
 import {
@@ -54,6 +60,8 @@ const role = user?.role;
 const Dashboard = () => {
   // États existants
   const [sensorData, setSensorData] = useState<SensorData[]>([]);
+  const [sensors, setSensors] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -349,6 +357,7 @@ const Dashboard = () => {
                   </>
                 )}
               </div>
+              
             </div>
           </div>
         </div>
@@ -537,6 +546,7 @@ const Dashboard = () => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="p-6 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-900">Données en temps réel</h3>
+              
               <div className="flex space-x-2">
                 {(role === 'chercheur' || role === 'gestionnaire') && (
                   <button

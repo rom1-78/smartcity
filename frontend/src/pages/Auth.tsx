@@ -252,12 +252,12 @@ function RegisterForm({
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-200"
         >
           <option value="citoyen">Citoyen</option>
-          <option value="researcher">Chercheur</option>
+          <option value="chercheur">Chercheur</option>
           <option value="gestionnaire">Gestionnaire urbain</option>
         </select>
       </div>
       {/* Organisation (conditionnel) */}
-      {(registerData.role === 'researcher' || registerData.role === 'gestionnaire') && (
+      {(registerData.role === 'chercheur' || registerData.role === 'gestionnaire') && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             <Building className="inline h-4 w-4 mr-1" />
@@ -483,7 +483,7 @@ const Auth: React.FC = () => {
     else if (registerData.password.length < 8) newErrors.password = "Le mot de passe doit contenir au moins 8 caractères";
     if (registerData.password !== registerData.confirmPassword) newErrors.confirmPassword = "Les mots de passe ne correspondent pas";
     if (!registerData.acceptTerms) newErrors.acceptTerms = "Vous devez accepter les conditions d'utilisation";
-    if ((registerData.role === 'researcher' || registerData.role === 'gestionnaire') && !registerData.organization.trim()) {
+    if ((registerData.role === 'chercheur' || registerData.role === 'gestionnaire') && !registerData.organization.trim()) {
       newErrors.organization = "L'organisation est requise pour ce type de compte";
     }
     setErrors(newErrors);
@@ -678,7 +678,7 @@ const Auth: React.FC = () => {
             <div className="text-xs text-yellow-700 space-y-1">
               <p><strong>Admin:</strong> admin@techcity.fr / admin123</p>
               <p><strong>Gestionnaire:</strong> gestionnaire@techcity.fr / gestionnaire123</p>
-              <p><strong>Chercheur:</strong> researcher@techcity.fr / researcher123</p>
+              <p><strong>Chercheur:</strong> chercheur@techcity.fr / chercheur123</p>
               <p><strong>Citoyen:</strong> citoyen@techcity.fr / citoyen123</p>
             </div>
           </div>

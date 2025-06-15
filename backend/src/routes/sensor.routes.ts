@@ -1,28 +1,25 @@
-// backend/src/routes/sensor.routes.ts
-import express from 'express';
-import { 
-  getSensors, 
-  getSensorById, 
-  createSensor, 
-  updateSensor, 
-  deleteSensor, 
+import { Router } from 'express';
+import { authenticateToken } from '../middleware/auth';
+import {
+  getSensors,
+  getSensorById,
+  createSensor,
+  updateSensor,
+  deleteSensor,
   getSensorData,
+  addSensorData,
   getSensorStatistics
 } from '../controllers/sensor.controller';
-import { authenticateToken } from '../middleware/auth';
-import { requireRole } from '../middleware/roleAuth';
 
-const router = express.Router();
+const router = Router();
+router.use(authenticateToken);
 
-// Routes publiques (accessibles à tous les utilisateurs authentifiés)
-router.get('/', authenticateToken, getSensors);
-router.get('/statistics', authenticateToken, getSensorStatistics);
-router.get('/:id', authenticateToken, getSensorById);
-router.get('/:id/data', authenticateToken, getSensorData);
-
-// Routes restreintes aux gestionnaires et administrateurs
-router.post('/', authenticateToken, requireRole(['admin', 'gestionnaire']), createSensor);
-router.put('/:id', authenticateToken, requireRole(['admin', 'gestionnaire']), updateSensor);
-router.delete('/:id', authenticateToken, requireRole(['admin', 'gestionnaire']), deleteSensor);
+router.get('/', getSensors);
+router.get('/statistics', getSensorStatistics);
+router.get('/:id', getSensorById);
+router.post('/', createSensor);
+router.put('/:id', updateSensor);
+router.delete('/:id', deleteSensor);
+router.get('/:id/data', getSensorData);
 
 export default router;

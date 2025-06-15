@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS `users` (
 -- Listage des données de la table smartcity.users : ~3 rows (environ)
 INSERT INTO `users` (`id`, `first_name`, `last_name`, `email`, `password`, `role`, `organization`, `created_at`) VALUES
 	(1, '', '', 'admin', '$2b$10$abcdefghijklmnopqrstuv', 'admin', NULL, '2025-06-09 23:26:08'),
-	(2, '', '', 'citizen1', '$2b$10$abcdefghijklmnopqrstuv', 'citoyen', NULL, '2025-06-09 23:26:08'),
+	(2, '', '', 'citoyen1', '$2b$10$abcdefghijklmnopqrstuv', 'citoyen', NULL, '2025-06-09 23:26:08'),
 	(3, '', '', 'gestionnaire1', '$2b$10$abcdefghijklmnopqrstuv', 'gestionnaire', NULL, '2025-06-09 23:26:08'),
 	(4, 'gzrteg', 'greger', 'grezqg@gmail.com', '$2b$10$.ppXmmg/Enlrjb.d4yqbjuVuIm1cc8U77lJvdo0we55q8msN6nKa6', 'citoyen', '', '2025-06-10 20:19:27'),
 	(5, 'jcvrbehjvof', 'pibvreihbv', 'impbvfrekhzbvkrtfebzskv@mail.com', '$2b$10$VcDPlzBz/tICXyZd619W1etGrN1l4QXepQ4vIlLdwyuMdX27HLc6u', 'citoyen', '', '2025-06-11 17:10:22');

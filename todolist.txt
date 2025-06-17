@@ -2,3 +2,5 @@ map avec les capteurs
 les capteur en bdd + CRUD 
 data des capteur en bdd
 stocker les alertes en bdd
+pour tester j'ai mis des donnée dans ma base et il faut que tu remplace toute les donnée random en brut par des données qui sont dans ma bdd
+generer des capteur et des donnée de capteur

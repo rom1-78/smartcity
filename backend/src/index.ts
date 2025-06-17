@@ -1,3 +1,4 @@
+// backend/src/index.ts (MISE À JOUR)
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -5,6 +6,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes';
 import sensorRoutes from './routes/sensor.routes';
+import alertRoutes from './routes/alert.routes';         // NOUVEAU
+import reportRoutes from './routes/report.routes';       // NOUVEAU
+import suggestionRoutes from './routes/suggestion.routes'; // NOUVEAU
 
 dotenv.config();
 const app = express();
@@ -14,20 +18,55 @@ const io = new Server(server, { cors: { origin: '*' } });
 app.use(cors());
 app.use(express.json());
 
+// Routes existantes
 app.use('/api/auth', authRoutes);
 app.use('/api/sensors', sensorRoutes);
 
+// Nouvelles routes
+app.use('/api/alerts', alertRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/suggestions', suggestionRoutes);
+
+// WebSocket pour les données temps réel (amélioré)
 io.on('connection', (socket) => {
-  console.log('Client connecté');
-  setInterval(() => {
-    const fakeData = {
-      temperature: Math.floor(Math.random() * 10) + 20,
-      humidity: Math.floor(Math.random() * 50) + 30,
-      timestamp: new Date().toISOString(),
+  console.log('Client connecté:', socket.id);
+  
+  // Simulation d'alertes temps réel
+  const alertInterval = setInterval(() => {
+    // Simuler une alerte occasionnelle
+    if (Math.random() > 0.95) { // 5% de chance
+      const mockAlert = {
+        id: Date.now(),
+        type: Math.random() > 0.7 ? 'critical' : 'warning',
+        message: 'Nouvelle alerte détectée',
+        timestamp: new Date().toISOString(),
+        sensor_id: Math.floor(Math.random() * 10) + 1
+      };
+      socket.emit('newAlert', mockAlert);
+    }
+  }, 5000);
+
+  // Simulation de nouvelles données de capteurs
+  const dataInterval = setInterval(() => {
+    const mockSensorData = {
+      sensor_id: Math.floor(Math.random() * 10) + 1,
+      value: Math.random() * 100,
+      unit: 'mock',
+      timestamp: new Date().toISOString()
     };
-    socket.emit('sensorData', fakeData);
-  }, 3000);
+    socket.emit('newSensorData', mockSensorData);
+  }, 10000);
+
+  socket.on('disconnect', () => {
+    console.log('Client déconnecté:', socket.id);
+    clearInterval(alertInterval);
+    clearInterval(dataInterval);
+  });
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Serveur lancé sur le port ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`🚀 Serveur Smart City lancé sur le port ${PORT}`);
+  console.log(`📊 API disponible sur http://localhost:${PORT}/api`);
+  console.log(`🔌 WebSocket disponible sur ws://localhost:${PORT}`);
+});

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from "../components/Navbar";
 import ParisIoTMap from "../components/ParisIoTMap.tsx";  // NOUVEAU COMPOSANT
+// import TestMap from "../components/TestMap.tsx";
 import { isLoggedIn, removeToken, getUserFromToken } from "../services/auth";
 import { useNavigate } from "react-router-dom";
 import {
@@ -291,8 +292,8 @@ const Dashboard = () => {
                 key={key}
                 onClick={() => setCurrentView(key as any)}
                 className={`flex-1 flex items-center justify-center px-4 py-3 rounded-lg font-medium transition duration-200 ${currentView === key
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
               >
                 <Icon className="h-5 w-5 mr-2" />
@@ -502,11 +503,12 @@ const Dashboard = () => {
         {/* Vue Carte Interactive */}
         {currentView === 'map' && (
           <div className="space-y-6">
-            
+
 
             {/* Composant carte principal */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <ParisIoTMap />
+              {/* <TestMap /> */}
             </div>
 
             {/* Panneau d'informations complémentaires */}
@@ -596,8 +598,8 @@ const Dashboard = () => {
                             </div>
                           </div>
                           <span className={`text-xs px-2 py-1 rounded-full font-medium ${sensor.status === 'critical'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-yellow-100 text-yellow-800'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-yellow-100 text-yellow-800'
                             }`}>
                             {sensor.status === 'critical' ? 'Critique' : 'Attention'}
                           </span>

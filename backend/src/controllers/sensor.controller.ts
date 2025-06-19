@@ -36,13 +36,11 @@ interface SensorRequest {
 // GET /api/sensors - Récupérer tous les capteurs
 export const getSensors = async (req: AuthRequest, res: Response) => {
   try {
-    console.log('🔄 Récupération des capteurs depuis la base de données...');
     
     const [rows] = await db.execute<RowDataPacket[]>(
       'SELECT * FROM sensors ORDER BY id DESC'
     );
     
-    console.log('✅ Capteurs récupérés:', rows.length);
     res.json(rows);
   } catch (error) {
     console.error('❌ Erreur lors de la récupération des capteurs:', error);

@@ -66,7 +66,4 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log(`🚀 Serveur Smart City lancé sur le port ${PORT}`);
-  console.log(`📊 API disponible sur http://localhost:${PORT}/api`);
-  console.log(`🔌 WebSocket disponible sur ws://localhost:${PORT}`);
 });

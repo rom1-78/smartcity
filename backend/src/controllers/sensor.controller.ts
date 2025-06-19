@@ -38,7 +38,6 @@ export const getSensors = async (req: AuthRequest, res: Response) => {
   try {
     console.log('🔄 Récupération des capteurs depuis la base de données...');
     
-    // 🔧 CORRECTION: Requête simplifiée sans created_at si la colonne n'existe pas
     const [rows] = await db.execute<RowDataPacket[]>(
       'SELECT * FROM sensors ORDER BY id DESC'
     );
@@ -71,14 +70,14 @@ export const getSensorById = async (req: AuthRequest, res: Response) => {
       'SELECT * FROM sensors WHERE id = ?',
       [id]
     );
-    
+
     if (rows.length === 0) {
       return res.status(404).json({ 
         error: 'Capteur non trouvé',
         message: `Aucun capteur trouvé avec l'ID ${id}`
       });
     }
-    
+
     res.json(rows[0]);
   } catch (error) {
     console.error('Erreur lors de la récupération du capteur:', error);
@@ -93,7 +92,12 @@ export const getSensorById = async (req: AuthRequest, res: Response) => {
 export const getSensorData = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { limit = 100, offset = 0, start_date, end_date } = req.query;
+    const { 
+      limit = '50', 
+      offset = '0', 
+      start_date, 
+      end_date 
+    } = req.query;
     
     if (!id || isNaN(Number(id))) {
       return res.status(400).json({ 
@@ -101,8 +105,8 @@ export const getSensorData = async (req: AuthRequest, res: Response) => {
         message: 'L\'ID du capteur doit être un nombre valide'
       });
     }
-    
-    // Vérifier si le capteur existe
+
+    // Vérifier que le capteur existe
     const [sensorRows] = await db.execute<RowDataPacket[]>(
       'SELECT id FROM sensors WHERE id = ?',
       [id]
@@ -129,15 +133,28 @@ export const getSensorData = async (req: AuthRequest, res: Response) => {
     }
 
     query += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?';
-    params.push(parseInt(limit as string), parseInt(offset as string));
+    
+    // 🔧 CORRECTION: Convertir explicitement en nombre
+    const limitNum = parseInt(limit as string, 10);
+    const offsetNum = parseInt(offset as string, 10);
+    
+    // Vérifier que les conversions sont valides
+    if (isNaN(limitNum) || isNaN(offsetNum)) {
+      return res.status(400).json({ 
+        error: 'Paramètres invalides',
+        message: 'Limit et offset doivent être des nombres valides'
+      });
+    }
+    
+    params.push(limitNum, offsetNum);
 
     const [dataRows] = await db.execute<RowDataPacket[]>(query, params);
     
     res.json({
       data: dataRows,
       pagination: {
-        limit: parseInt(limit as string),
-        offset: parseInt(offset as string),
+        limit: limitNum,
+        offset: offsetNum,
         total: dataRows.length
       }
     });
@@ -201,7 +218,7 @@ export const createSensor = async (req: AuthRequest, res: Response) => {
 
     if (existingRows.length > 0) {
       return res.status(409).json({ 
-        error: 'Capteur existant',
+        error: 'Nom de capteur existant',
         message: 'Un capteur avec ce nom existe déjà'
       });
     }
@@ -221,11 +238,12 @@ export const createSensor = async (req: AuthRequest, res: Response) => {
       }
     }
 
+    // Insérer le nouveau capteur
     const [result] = await db.execute<ResultSetHeader>(
-      `INSERT INTO sensors (
-        name, type, location, status, installed_at, 
-        latitude, longitude, serial_number, manufacturer, model, firmware_version
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO sensors 
+        (name, type, location, status, installed_at, latitude, longitude, 
+         serial_number, manufacturer, model, firmware_version) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name, type, location, status, installed_at,
         latitude || null, longitude || null, serial_number || null,
@@ -344,7 +362,7 @@ export const updateSensor = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // 🔧 CORRECTION: Requête de mise à jour simplifiée
+    // Mettre à jour le capteur
     await db.execute(
       `UPDATE sensors SET 
         name = ?, type = ?, location = ?, status = ?, installed_at = ?,
@@ -416,14 +434,15 @@ export const deleteSensor = async (req: AuthRequest, res: Response) => {
       // Ignorer l'erreur si la table sensor_data n'existe pas
     }
 
+    // Supprimer le capteur
     await db.execute('DELETE FROM sensors WHERE id = ?', [id]);
     
     res.json({
       message: 'Capteur supprimé avec succès',
-      deletedSensor: {
+      sensor: {
         id: parseInt(id),
         name: sensorName,
-        deletedDataCount: dataCount
+        associated_data_count: dataCount
       }
     });
   } catch (error) {
@@ -435,9 +454,10 @@ export const deleteSensor = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// GET /api/sensors/statistics - Récupérer les statistiques globales
-export const getSensorStatistics = async (req: AuthRequest, res: Response) => {
+// GET /api/sensors/stats - Statistiques des capteurs
+export const getSensorStats = async (req: AuthRequest, res: Response) => {
   try {
+    // Statistiques générales
     const [totalRows] = await db.execute<RowDataPacket[]>(
       'SELECT COUNT(*) as total FROM sensors'
     );
@@ -450,46 +470,162 @@ export const getSensorStatistics = async (req: AuthRequest, res: Response) => {
       'SELECT type, COUNT(*) as count FROM sensors GROUP BY type'
     );
 
-    // Statistiques des données récentes (optionnel, ignorer l'erreur si sensor_data n'existe pas)
-    let recentDataRows: any[] = [];
-    try {
-      const [result] = await db.execute<RowDataPacket[]>(
-        `SELECT s.type, COUNT(sd.id) as data_count, AVG(sd.value) as avg_value
-         FROM sensors s 
-         LEFT JOIN sensor_data sd ON s.id = sd.sensor_id 
-         WHERE sd.timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-         GROUP BY s.type`
-      );
-      recentDataRows = result;
-    } catch {
-      console.log('Table sensor_data non disponible pour les statistiques');
-    }
+    // Capteurs récemment ajoutés (derniers 30 jours)
+    const [recentRows] = await db.execute<RowDataPacket[]>(
+      'SELECT COUNT(*) as count FROM sensors WHERE installed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)'
+    );
 
-    const statistics = {
+    const stats = {
       total: totalRows[0].total,
-      byStatus: statusRows.reduce((acc: any, row: any) => {
+      recent_additions: recentRows[0].count,
+      by_status: statusRows.reduce((acc: any, row: any) => {
         acc[row.status] = row.count;
         return acc;
       }, {}),
-      byType: typeRows.reduce((acc: any, row: any) => {
+      by_type: typeRows.reduce((acc: any, row: any) => {
         acc[row.type] = row.count;
-        return acc;
-      }, {}),
-      recentData: recentDataRows.reduce((acc: any, row: any) => {
-        acc[row.type] = {
-          count: row.data_count,
-          average: parseFloat(row.avg_value || 0).toFixed(2)
-        };
         return acc;
       }, {})
     };
 
-    res.json(statistics);
+    res.json(stats);
   } catch (error) {
     console.error('Erreur lors de la récupération des statistiques:', error);
     res.status(500).json({ 
       error: 'Erreur interne du serveur',
       message: 'Impossible de récupérer les statistiques'
+    });
+  }
+};
+
+// GET /api/sensors/search - Rechercher des capteurs
+export const searchSensors = async (req: AuthRequest, res: Response) => {
+  try {
+    const { 
+      q, 
+      type, 
+      status, 
+      location,
+      limit = '20', 
+      offset = '0' 
+    } = req.query;
+
+    let query = 'SELECT * FROM sensors WHERE 1=1';
+    const params: any[] = [];
+
+    // Recherche textuelle
+    if (q) {
+      query += ' AND (name LIKE ? OR location LIKE ? OR serial_number LIKE ?)';
+      const searchTerm = `%${q}%`;
+      params.push(searchTerm, searchTerm, searchTerm);
+    }
+
+    // Filtre par type
+    if (type) {
+      query += ' AND type = ?';
+      params.push(type);
+    }
+
+    // Filtre par statut
+    if (status) {
+      query += ' AND status = ?';
+      params.push(status);
+    }
+
+    // Filtre par localisation
+    if (location) {
+      query += ' AND location LIKE ?';
+      params.push(`%${location}%`);
+    }
+
+    query += ' ORDER BY id DESC LIMIT ? OFFSET ?';
+    
+    // 🔧 CORRECTION: Convertir explicitement en nombre
+    const limitNum = parseInt(limit as string, 10);
+    const offsetNum = parseInt(offset as string, 10);
+    
+    if (isNaN(limitNum) || isNaN(offsetNum)) {
+      return res.status(400).json({ 
+        error: 'Paramètres invalides',
+        message: 'Limit et offset doivent être des nombres valides'
+      });
+    }
+    
+    params.push(limitNum, offsetNum);
+
+    const [rows] = await db.execute<RowDataPacket[]>(query, params);
+    
+    res.json({
+      sensors: rows,
+      pagination: {
+        limit: limitNum,
+        offset: offsetNum,
+        total: rows.length
+      }
+    });
+  } catch (error) {
+    console.error('Erreur lors de la recherche de capteurs:', error);
+    res.status(500).json({ 
+      error: 'Erreur interne du serveur',
+      message: 'Impossible de rechercher les capteurs'
+    });
+  }
+};
+
+// POST /api/sensors/:id/data - Ajouter des données à un capteur
+export const addSensorData = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { value, unit, timestamp } = req.body;
+    
+    if (!id || isNaN(Number(id))) {
+      return res.status(400).json({ 
+        error: 'ID invalide',
+        message: 'L\'ID du capteur doit être un nombre valide'
+      });
+    }
+
+    if (value === undefined || value === null) {
+      return res.status(400).json({ 
+        error: 'Valeur manquante',
+        message: 'La valeur est requise'
+      });
+    }
+
+    // Vérifier que le capteur existe
+    const [sensorRows] = await db.execute<RowDataPacket[]>(
+      'SELECT id FROM sensors WHERE id = ?',
+      [id]
+    );
+
+    if (sensorRows.length === 0) {
+      return res.status(404).json({ 
+        error: 'Capteur non trouvé',
+        message: `Aucun capteur trouvé avec l'ID ${id}`
+      });
+    }
+
+    // Insérer les données
+    const [result] = await db.execute<ResultSetHeader>(
+      'INSERT INTO sensor_data (sensor_id, value, unit, timestamp) VALUES (?, ?, ?, ?)',
+      [id, value, unit || null, timestamp || new Date()]
+    );
+    
+    res.status(201).json({
+      message: 'Données ajoutées avec succès',
+      data: {
+        id: result.insertId,
+        sensor_id: parseInt(id),
+        value,
+        unit,
+        timestamp: timestamp || new Date()
+      }
+    });
+  } catch (error) {
+    console.error('Erreur lors de l\'ajout des données:', error);
+    res.status(500).json({ 
+      error: 'Erreur interne du serveur',
+      message: 'Impossible d\'ajouter les données'
     });
   }
 };

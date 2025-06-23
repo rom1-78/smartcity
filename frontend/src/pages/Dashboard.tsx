@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from "../components/Navbar";
-import ParisIoTMap from "../components/ParisIoTMap.tsx";  // NOUVEAU COMPOSANT
-// import TestMap from "../components/TestMap.tsx";
+import ParisIoTMap from "../components/ParisIoTMap.tsx";
 import { isLoggedIn, removeToken, getUserFromToken } from "../services/auth";
-import SensorCRUDModal from "../components/SensorCRUDModal";
-
 import { useNavigate } from "react-router-dom";
 import {
   getSensors,
@@ -48,6 +45,10 @@ import {
   FileText
 } from 'lucide-react';
 
+// ===============================
+// TYPES
+// ===============================
+
 // Types pour les données en temps réel
 interface SensorData {
   id: string;
@@ -67,13 +68,488 @@ interface Alert {
   location: string;
 }
 
-// Obtenir les informations utilisateur
+// Type pour les capteurs réels de la BDD
+interface RealSensor {
+  id?: number;
+  name: string;
+  type: string;
+  location: string;
+  status: 'actif' | 'inactif' | 'maintenance';
+  installed_at: string;
+  latitude?: number;
+  longitude?: number;
+  serial_number?: string;
+  manufacturer?: string;
+  model?: string;
+  firmware_version?: string;
+}
+
+// ===============================
+// COMPOSANTS CRUD INTÉGRÉS
+// ===============================
+
+// Composant Modal CRUD
+interface SensorCRUDModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  sensor?: RealSensor;
+  mode: 'add' | 'edit';
+  onSensorChange: () => void;
+}
+
+const SensorCRUDModal: React.FC<SensorCRUDModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  sensor, 
+  mode, 
+  onSensorChange 
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // État du formulaire
+  const [formData, setFormData] = useState<RealSensor>({
+    name: '',
+    type: 'temperature',
+    location: '',
+    status: 'actif',
+    installed_at: new Date().toISOString().split('T')[0], // Date actuelle par défaut
+    latitude: 48.8566,
+    longitude: 2.3522,
+    serial_number: '',
+    manufacturer: '',
+    model: '',
+    firmware_version: ''
+  });
+
+  // Types de capteurs disponibles
+  const sensorTypes = [
+    { value: 'temperature', label: '🌡️ Température' },
+    { value: 'air_quality', label: '🌬️ Qualité de l\'air' },
+    { value: 'noise', label: '🔊 Niveau sonore' },
+    { value: 'humidity', label: '💧 Humidité' },
+    { value: 'traffic', label: '🚗 Circulation' },
+    { value: 'pollution', label: '🏭 Pollution' }
+  ];
+
+  // Statuts disponibles
+  const statusOptions = [
+    { value: 'actif', label: 'Actif' },
+    { value: 'inactif', label: 'Inactif' },
+    { value: 'maintenance', label: 'Maintenance' }
+  ];
+
+  // Initialiser le formulaire si mode édition
+  useEffect(() => {
+    if (mode === 'edit' && sensor) {
+      setFormData({
+        ...sensor,
+        installed_at: sensor.installed_at.split('T')[0],
+        latitude: sensor.latitude ?? 48.8566,
+        longitude: sensor.longitude ?? 2.3522
+      });
+    } else {
+      // Réinitialiser le formulaire en mode ajout avec date actuelle
+      const today = new Date().toISOString().split('T')[0];
+      setFormData({
+        name: '',
+        type: 'temperature',
+        location: '',
+        status: 'actif',
+        installed_at: today,
+        latitude: 48.8566,
+        longitude: 2.3522,
+        serial_number: '',
+        manufacturer: '',
+        model: '',
+        firmware_version: ''
+      });
+    }
+    setError('');
+    setSuccess('');
+  }, [sensor, mode, isOpen]);
+
+  // Fonction API
+  const apiCall = async (url: string, method: string = 'GET', body?: any) => {
+    const token = localStorage.getItem('userToken');
+    if (!token) throw new Error('Token manquant');
+
+    const options: RequestInit = {
+      method,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    };
+
+    if (body) {
+      options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Erreur ${response.status}`);
+    }
+
+    return response.json();
+  };
+
+  // Gérer les changements du formulaire
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'latitude' || name === 'longitude' ? parseFloat(value) || 0 : value
+    }));
+  };
+
+  // Soumettre le formulaire
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      if (mode === 'edit' && sensor?.id) {
+        await apiCall(`http://localhost:5000/api/sensors/${sensor.id}`, 'PUT', formData);
+        setSuccess('Capteur mis à jour avec succès !');
+      } else {
+        await apiCall('http://localhost:5000/api/sensors', 'POST', formData);
+        setSuccess('Capteur créé avec succès !');
+      }
+
+      onSensorChange();
+
+      // Fermer la modal après 1.5 secondes
+      setTimeout(() => {
+        onClose();
+        setSuccess('');
+      }, 1500);
+
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la sauvegarde');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Supprimer un capteur
+  const handleDelete = async () => {
+    if (!sensor?.id) return;
+    
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer le capteur "${sensor.name}" ?`)) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      await apiCall(`http://localhost:5000/api/sensors/${sensor.id}`, 'DELETE');
+      setSuccess('Capteur supprimé avec succès !');
+      
+      onSensorChange();
+
+      setTimeout(() => {
+        onClose();
+        setSuccess('');
+      }, 1000);
+
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la suppression');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center p-6 border-b">
+          <h2 className="text-xl font-bold text-gray-900">
+            {mode === 'edit' ? '✏️ Modifier le capteur' : '📡 Ajouter un capteur'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* Messages */}
+        {error && (
+          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
+            <AlertCircle size={16} className="text-red-500" />
+            <span className="text-red-700">{error}</span>
+          </div>
+        )}
+
+        {success && (
+          <div className="mx-6 mt-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+            <CheckCircle size={16} className="text-green-500" />
+            <span className="text-green-700">{success}</span>
+          </div>
+        )}
+
+        {/* Formulaire */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Informations de base */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
+              📋 Informations du capteur
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Nom */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nom du capteur *
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: Capteur Température Centre-ville"
+                />
+              </div>
+
+              {/* Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Type de capteur *
+                </label>
+                <select
+                  name="type"
+                  value={formData.type}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {sensorTypes.map(type => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Localisation */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Localisation *
+                </label>
+                <input
+                  type="text"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Ex: Centre-ville, Quartier Nord..."
+                />
+              </div>
+
+              {/* Statut */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Statut *
+                </label>
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {statusOptions.map(status => (
+                    <option key={status.value} value={status.value}>
+                      {status.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Latitude */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Latitude *
+                </label>
+                <input
+                  type="number"
+                  name="latitude"
+                  value={formData.latitude}
+                  onChange={handleInputChange}
+                  step="0.000001"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="48.8566"
+                />
+              </div>
+
+              {/* Longitude */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Longitude *
+                </label>
+                <input
+                  type="number"
+                  name="longitude"
+                  value={formData.longitude}
+                  onChange={handleInputChange}
+                  step="0.000001"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="2.3522"
+                />
+              </div>
+            </div>
+
+            {/* Date d'installation (en lecture seule en mode ajout) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date d'installation
+              </label>
+              <input
+                type="date"
+                name="installed_at"
+                value={formData.installed_at}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
+                readOnly={mode === 'add'}
+              />
+              {mode === 'add' && (
+                <p className="text-xs text-gray-500 mt-1">
+                  La date d'installation sera automatiquement définie à aujourd'hui
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Boutons d'action */}
+          <div className="flex justify-between pt-6 border-t">
+            {/* Bouton supprimer (seulement en mode édition) */}
+            {mode === 'edit' && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={loading}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                <Trash2 size={16} />
+                Supprimer
+              </button>
+            )}
+
+            {/* Boutons principaux */}
+            <div className="flex gap-3 ml-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    {mode === 'edit' ? 'Mise à jour...' : 'Création...'}
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    {mode === 'edit' ? 'Mettre à jour' : 'Créer le capteur'}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Composant Menu d'actions pour les capteurs
+interface SensorActionsMenuProps {
+  sensor: RealSensor;
+  onEdit: (sensor: RealSensor) => void;
+  onViewDetails?: (sensor: RealSensor) => void;
+}
+
+const SensorActionsMenu: React.FC<SensorActionsMenuProps> = ({ 
+  sensor, 
+  onEdit, 
+  onViewDetails 
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+      >
+        <Settings size={16} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border z-50">
+          <div className="py-1">
+            <button
+              onClick={() => {
+                onEdit(sensor);
+                setIsOpen(false);
+              }}
+              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+            >
+              <Edit size={14} />
+              Modifier
+            </button>
+            {onViewDetails && (
+              <button
+                onClick={() => {
+                  onViewDetails(sensor);
+                  setIsOpen(false);
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+              >
+                <Eye size={14} />
+                Détails
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ===============================
+// COMPOSANT PRINCIPAL DASHBOARD
+// ===============================
+
 const user = getUserFromToken();
 const role = user?.role;
 
 const Dashboard = () => {
   // États principaux
   const [sensorData, setSensorData] = useState<SensorData[]>([]);
+  const [realSensors, setRealSensors] = useState<RealSensor[]>([]);
   const [sensors, setSensors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -82,11 +558,15 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
 
   // États de l'interface
-  const [currentView, setCurrentView] = useState<'overview' | 'map' | 'data' | 'analytics' | 'sensors'>('overview');
+  const [currentView, setCurrentView] = useState<'overview' | 'map' | 'analytics' | 'sensors'>('overview');
   const [showExportModal, setShowExportModal] = useState(false);
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
   const [showAddSensorModal, setShowAddSensorModal] = useState(false);
   const [showSensorCRUDModal, setShowSensorCRUDModal] = useState(false);
+
+  // États pour le CRUD
+  const [crudMode, setCrudMode] = useState<'add' | 'edit'>('add');
+  const [selectedSensor, setSelectedSensor] = useState<RealSensor | undefined>();
 
   const [newSuggestion, setNewSuggestion] = useState('');
 
@@ -107,6 +587,44 @@ const Dashboard = () => {
       return;
     }
   }, [navigate]);
+
+  // Fonction pour charger les capteurs réels depuis l'API
+  const loadRealSensors = async () => {
+    try {
+      setLoading(true);
+      const sensorsData = await getSensors();
+      setRealSensors(sensorsData);
+      console.log('✅ Capteurs réels chargés:', sensorsData.length);
+    } catch (error) {
+      console.error('❌ Erreur chargement capteurs:', error);
+      setError('Erreur lors du chargement des capteurs');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Chargement initial des capteurs réels
+  useEffect(() => {
+    loadRealSensors();
+  }, []);
+
+  // Callbacks pour le CRUD
+  const handleAddSensor = () => {
+    setCrudMode('add');
+    setSelectedSensor(undefined);
+    setShowSensorCRUDModal(true);
+  };
+
+  const handleEditSensor = (sensor: RealSensor) => {
+    setCrudMode('edit');
+    setSelectedSensor(sensor);
+    setShowSensorCRUDModal(true);
+  };
+
+  const handleSensorChange = () => {
+    console.log('🔄 Rafraîchissement des capteurs...');
+    loadRealSensors();
+  };
 
   // Fonction pour obtenir l'icône d'un capteur
   const getSensorIcon = (type: string) => {
@@ -131,17 +649,20 @@ const Dashboard = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'normal':
+      case 'actif':
         return 'bg-green-100 text-green-800';
       case 'warning':
+      case 'maintenance':
         return 'bg-yellow-100 text-yellow-800';
       case 'critical':
+      case 'inactif':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
   };
 
-  // Simulation de données de capteurs
+  // Simulation de données de capteurs (gardé pour compatibilité)
   useEffect(() => {
     const generateMockData = () => {
       const types = ['temperature', 'air_quality', 'noise', 'traffic', 'humidity'];
@@ -160,27 +681,27 @@ const Dashboard = () => {
 
         switch (type) {
           case 'temperature':
-            value = Math.random() * 40 + 5; // 5-45°C
+            value = Math.random() * 40 + 5;
             if (value > 35) status = 'critical';
             else if (value > 30) status = 'warning';
             break;
           case 'air_quality':
-            value = Math.random() * 80 + 10; // 10-90 µg/m³
+            value = Math.random() * 80 + 10;
             if (value > 60) status = 'critical';
             else if (value > 40) status = 'warning';
             break;
           case 'noise':
-            value = Math.random() * 50 + 40; // 40-90 dB
+            value = Math.random() * 50 + 40;
             if (value > 80) status = 'critical';
             else if (value > 70) status = 'warning';
             break;
           case 'traffic':
-            value = Math.random() * 400 + 50; // 50-450 véh/h
+            value = Math.random() * 400 + 50;
             if (value > 350) status = 'critical';
             else if (value > 250) status = 'warning';
             break;
           case 'humidity':
-            value = Math.random() * 60 + 30; // 30-90%
+            value = Math.random() * 60 + 30;
             if (value > 80) status = 'critical';
             else if (value > 70) status = 'warning';
             break;
@@ -201,7 +722,7 @@ const Dashboard = () => {
 
       setSensorData(mockSensors);
 
-      // Générer quelques alertes - MODIFIÉ AVEC LABELS FRANÇAIS
+      // Générer quelques alertes
       const criticalSensors = mockSensors.filter(s => s.status === 'critical');
       const mockAlerts: Alert[] = criticalSensors.slice(0, 3).map((sensor, index) => ({
         id: (index + 1).toString(),
@@ -217,7 +738,6 @@ const Dashboard = () => {
     generateMockData();
     setIsLoading(false);
 
-    // Mise à jour périodique
     const interval = setInterval(generateMockData, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -261,11 +781,9 @@ const Dashboard = () => {
 
   const submitSuggestion = () => {
     if (newSuggestion.trim()) {
-      // Ici, vous ajouteriez la logique pour envoyer la suggestion
       console.log('Suggestion envoyée:', newSuggestion);
       setNewSuggestion('');
       setShowSuggestionModal(false);
-      // Afficher une notification de succès
     }
   };
 
@@ -300,7 +818,6 @@ const Dashboard = () => {
             {[
               { key: 'overview', label: 'Vue d\'ensemble', icon: BarChart3 },
               { key: 'map', label: 'Carte Interactive', icon: MapPin },
-              { key: 'data', label: 'Données Détaillées', icon: Database },
               { key: 'analytics', label: 'Analyses', icon: TrendingUp },
               ...(role === 'gestionnaire' || role === 'admin' ? [{ key: 'sensors', label: 'Gestion Capteurs', icon: Settings }] : [])
             ].map(({ key, label, icon: Icon }) => (
@@ -332,7 +849,7 @@ const Dashboard = () => {
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-500">Capteurs Actifs</p>
                     <p className="text-2xl font-semibold text-gray-900">
-                      {sensorData.filter(s => s.status === 'normal').length}
+                      {realSensors.filter(s => s.status === 'actif').length}
                     </p>
                   </div>
                 </div>
@@ -344,9 +861,9 @@ const Dashboard = () => {
                     <AlertTriangle className="h-8 w-8 text-yellow-600" />
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500">Alertes</p>
+                    <p className="text-sm font-medium text-gray-500">En Maintenance</p>
                     <p className="text-2xl font-semibold text-gray-900">
-                      {sensorData.filter(s => s.status !== 'normal').length}
+                      {realSensors.filter(s => s.status === 'maintenance').length}
                     </p>
                   </div>
                 </div>
@@ -358,13 +875,9 @@ const Dashboard = () => {
                     <Thermometer className="h-8 w-8 text-orange-600" />
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500">Temp. Moyenne</p>
+                    <p className="text-sm font-medium text-gray-500">Total Capteurs</p>
                     <p className="text-2xl font-semibold text-gray-900">
-                      {(sensorData
-                        .filter(s => s.type === 'temperature')
-                        .reduce((acc, s) => acc + s.value, 0) /
-                        sensorData.filter(s => s.type === 'temperature').length || 0
-                      ).toFixed(1)}°C
+                      {realSensors.length}
                     </p>
                   </div>
                 </div>
@@ -373,120 +886,30 @@ const Dashboard = () => {
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
-                    <Wind className="h-8 w-8 text-green-600" />
+                    <Wind className="h-8 w-8 text-red-600" />
                   </div>
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-500">Qualité Air</p>
+                    <p className="text-sm font-medium text-gray-500">Hors Service</p>
                     <p className="text-2xl font-semibold text-gray-900">
-                      {(sensorData
-                        .filter(s => s.type === 'air_quality')
-                        .reduce((acc, s) => acc + s.value, 0) /
-                        sensorData.filter(s => s.type === 'air_quality').length || 0
-                      ).toFixed(0)} µg/m³
+                      {realSensors.filter(s => s.status === 'inactif').length}
                     </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Aperçu des capteurs récents */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Aperçu des Capteurs</h3>
-                  <button
-                    onClick={() => setCurrentView('data')}
-                    className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
-                  >
-                    Voir tout
-                    <Eye className="h-4 w-4 ml-1" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Type de Capteur
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Localisation
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Valeur
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Statut
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Dernière mise à jour
-                      </th>
-                      {(role === 'gestionnaire' || role === 'admin') && (
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {sensorData.slice(0, 15).map((sensor) => (
-                      <tr key={sensor.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            {getSensorIcon(sensor.type)}
-                            <span className="ml-2 text-sm font-medium text-gray-900">
-                              {getSensorLabel(sensor.type)}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {sensor.location}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {sensor.value} {sensor.unit}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(sensor.status)}`}>
-                            {sensor.status === 'normal' ? 'Normal' :
-                              sensor.status === 'warning' ? 'Attention' : 'Critique'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {sensor.timestamp.toLocaleTimeString('fr-FR')}
-                        </td>
-                        {(role === 'gestionnaire' || role === 'admin') && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              <button className="text-blue-600 hover:text-blue-900">
-                                <Eye className="h-4 w-4" />
-                              </button>
-                              <button className="text-gray-600 hover:text-gray-900">
-                                <Settings className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Actions rapides selon le rôle */}
+            {/* Actions rapides */}
             <div className="mb-8">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions rapides</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {(role === 'gestionnaire' || role === 'admin') && (
                   <>
                     <button
-                      onClick={() => setCurrentView('data')}
-                      className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition duration-200 flex items-center justify-center"
+                      onClick={handleAddSensor}
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition duration-200 flex items-center justify-center"
                     >
-                      <BarChart3 className="h-5 w-5 mr-2" />
-                      Analyser tendances
+                      <Plus className="h-5 w-5 mr-2" />
+                      Ajouter capteur
                     </button>
                     <button
                       onClick={() => setCurrentView('map')}
@@ -503,8 +926,8 @@ const Dashboard = () => {
                       Générer rapport
                     </button>
                     <button
-                      onClick={() => setShowSensorCRUDModal(true)}
-                      className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition duration-200 flex items-center justify-center"
+                      onClick={() => setCurrentView('sensors')}
+                      className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition duration-200 flex items-center justify-center"
                     >
                       <Settings className="h-5 w-5 mr-2" />
                       Gérer capteurs
@@ -513,18 +936,122 @@ const Dashboard = () => {
                 )}
               </div>
             </div>
+
+            {/* Aperçu des capteurs récents */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">Aperçu des Capteurs</h3>
+                  <button
+                    onClick={() => setCurrentView('sensors')}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
+                  >
+                    Voir tout
+                    <Eye className="h-4 w-4 ml-1" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Nom
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Localisation
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Statut
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date d'installation
+                      </th>
+                      {(role === 'gestionnaire' || role === 'admin') && (
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {realSensors.slice(0, 10).map((sensor) => (
+                      <tr key={sensor.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {sensor.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            {getSensorIcon(sensor.type)}
+                            <span className="ml-2 text-sm font-medium text-gray-900">
+                              {getSensorLabel(sensor.type)}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {sensor.location}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(sensor.status)}`}>
+                            {sensor.status === 'actif' ? 'Actif' :
+                              sensor.status === 'maintenance' ? 'Maintenance' : 'Inactif'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(sensor.installed_at).toLocaleDateString('fr-FR')}
+                        </td>
+                        {(role === 'gestionnaire' || role === 'admin') && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <SensorActionsMenu 
+                              sensor={sensor}
+                              onEdit={handleEditSensor}
+                            />
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </>
         )}
 
         {/* Vue Carte Interactive */}
         {currentView === 'map' && (
           <div className="space-y-6">
-
+            {/* Bouton d'ajout sur la carte */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-900">🗺️ Carte IoT connectée à la BDD</h3>
+                <div className="flex gap-2">
+                  {(role === 'gestionnaire' || role === 'admin') && (
+                    <button
+                      onClick={handleAddSensor}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                    >
+                      <Plus size={16} />
+                      Ajouter un capteur
+                    </button>
+                  )}
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded flex items-center gap-2 hover:bg-gray-200"
+                  >
+                    <RefreshCw size={16} />
+                    Recharger
+                  </button>
+                </div>
+              </div>
+            </div>
 
             {/* Composant carte principal */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <ParisIoTMap />
-              {/* <TestMap /> */}
             </div>
 
             {/* Panneau d'informations complémentaires */}
@@ -567,9 +1094,8 @@ const Dashboard = () => {
                   Répartition par Zone
                 </h3>
                 <div className="space-y-3">
-                  {/* Calcul dynamique des zones basé sur les données réelles */}
                   {Object.entries(
-                    sensorData.reduce((acc, sensor) => {
+                    realSensors.reduce((acc, sensor) => {
                       const zone = sensor.location.split(',')[0] || sensor.location;
                       acc[zone] = (acc[zone] || 0) + 1;
                       return acc;
@@ -581,7 +1107,7 @@ const Dashboard = () => {
                         <div className="w-16 bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-blue-500 h-2 rounded-full"
-                            style={{ width: `${(count / sensorData.length) * 100}%` }}
+                            style={{ width: `${(count / realSensors.length) * 100}%` }}
                           ></div>
                         </div>
                         <span className="text-sm font-medium text-gray-900">{count}</span>
@@ -598,8 +1124,8 @@ const Dashboard = () => {
                   Maintenance Requise
                 </h3>
                 <div className="space-y-3">
-                  {sensorData
-                    .filter(sensor => sensor.status === 'warning' || sensor.status === 'critical')
+                  {realSensors
+                    .filter(sensor => sensor.status === 'maintenance' || sensor.status === 'inactif')
                     .slice(0, 4)
                     .map((sensor) => (
                       <div key={sensor.id} className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
@@ -608,237 +1134,27 @@ const Dashboard = () => {
                             {getSensorIcon(sensor.type)}
                             <div>
                               <p className="text-sm font-medium text-yellow-800">
-                                {getSensorLabel(sensor.type)}
+                                {sensor.name}
                               </p>
                               <p className="text-xs text-yellow-600">{sensor.location}</p>
                             </div>
                           </div>
-                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${sensor.status === 'critical'
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${sensor.status === 'inactif'
                             ? 'bg-red-100 text-red-800'
                             : 'bg-yellow-100 text-yellow-800'
                             }`}>
-                            {sensor.status === 'critical' ? 'Critique' : 'Attention'}
+                            {sensor.status === 'inactif' ? 'Hors service' : 'Maintenance'}
                           </span>
                         </div>
                       </div>
                     ))}
-                  {sensorData.filter(s => s.status === 'warning' || s.status === 'critical').length === 0 && (
+                  {realSensors.filter(s => s.status === 'maintenance' || s.status === 'inactif').length === 0 && (
                     <div className="text-center py-4">
                       <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
                       <p className="text-sm text-gray-500">Tous les capteurs fonctionnent normalement</p>
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
-
-            {/* Actions rapides contextuelles */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions Rapides</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button
-                  onClick={() => setCurrentView('data')}
-                  className="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition duration-200 text-left"
-                >
-                  <Database className="h-6 w-6 text-blue-600 mb-2" />
-                  <div className="font-medium text-gray-900">Analyser les Données</div>
-                  <div className="text-sm text-gray-600">Accéder aux données détaillées</div>
-                </button>
-
-                <button
-                  onClick={() => setShowExportModal(true)}
-                  className="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition duration-200 text-left"
-                >
-                  <Download className="h-6 w-6 text-green-600 mb-2" />
-                  <div className="font-medium text-gray-900">Exporter</div>
-                  <div className="text-sm text-gray-600">Télécharger les données</div>
-                </button>
-
-                {(role === 'gestionnaire' || role === 'admin') && (
-                  <button
-                    onClick={() => {/* Fonction pour ouvrir le panneau de gestion des alertes */ }}
-                    className="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition duration-200 text-left"
-                  >
-                    <Bell className="h-6 w-6 text-orange-600 mb-2" />
-                    <div className="font-medium text-gray-900">Gérer les Alertes</div>
-                    <div className="text-sm text-gray-600">Configurer les seuils</div>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Vue Données Détaillées */}
-        {currentView === 'data' && (
-          <div className="space-y-6">
-            {/* Filtres */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Filtres de données</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-5 w-5 text-gray-500" />
-                  <label className="text-sm font-medium text-gray-700">Début:</label>
-                  <input
-                    type="date"
-                    value={dateFilter.start}
-                    onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
-                    className="border border-gray-300 rounded-md px-3 py-1 text-sm"
-                  />
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Calendar className="h-5 w-5 text-gray-500" />
-                  <label className="text-sm font-medium text-gray-700">Fin:</label>
-                  <input
-                    type="date"
-                    value={dateFilter.end}
-                    onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
-                    className="border border-gray-300 rounded-md px-3 py-1 text-sm"
-                  />
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Filter className="h-5 w-5 text-gray-500" />
-                  <label className="text-sm font-medium text-gray-700">Zone:</label>
-                  <select
-                    value={locationFilter}
-                    onChange={(e) => setLocationFilter(e.target.value)}
-                    className="border border-gray-300 rounded-md px-3 py-1 text-sm"
-                  >
-                    <option value="all">Toutes les zones</option>
-                    <option value="Centre-ville">Centre-ville</option>
-                    <option value="Quartier Nord">Quartier Nord</option>
-                    <option value="Zone Sud">Zone Sud</option>
-                    <option value="Secteur Est">Secteur Est</option>
-                    <option value="Banlieue Ouest">Banlieue Ouest</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Filter className="h-5 w-5 text-gray-500" />
-                  <label className="text-sm font-medium text-gray-700">Type:</label>
-                  <select
-                    value={sensorTypeFilter}
-                    onChange={(e) => setSensorTypeFilter(e.target.value)}
-                    className="border border-gray-300 rounded-md px-3 py-1 text-sm"
-                  >
-                    <option value="all">Tous les types</option>
-                    <option value="temperature">{getSensorLabel('temperature')}</option>
-                    <option value="air_quality">{getSensorLabel('air_quality')}</option>
-                    <option value="noise">{getSensorLabel('noise')}</option>
-                    <option value="traffic">{getSensorLabel('traffic')}</option>
-                    <option value="humidity">{getSensorLabel('humidity')}</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Tableau de données complet */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Données Complètes des Capteurs</h3>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => setShowExportModal(true)}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200 flex items-center"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Exporter
-                    </button>
-                    {role === 'citoyen' && (
-                      <button
-                        onClick={() => setShowSuggestionModal(true)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-200 flex items-center"
-                      >
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Suggérer
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        ID
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Localisation
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Valeur
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Statut
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Dernière mise à jour
-                      </th>
-                      {(role === 'gestionnaire' || role === 'admin') && (
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {sensorData
-                      .filter(sensor =>
-                        (locationFilter === 'all' || sensor.location === locationFilter) &&
-                        (sensorTypeFilter === 'all' || sensor.type === sensorTypeFilter)
-                      )
-                      .map((sensor) => (
-                        <tr key={sensor.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {sensor.id}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              {getSensorIcon(sensor.type)}
-                              <span className="ml-2 text-sm font-medium text-gray-900">
-                                {getSensorLabel(sensor.type)}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {sensor.location}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {sensor.value} {sensor.unit}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(sensor.status)}`}>
-                              {sensor.status === 'normal' ? 'Normal' :
-                                sensor.status === 'warning' ? 'Attention' : 'Critique'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {sensor.timestamp.toLocaleString('fr-FR')}
-                          </td>
-                          {(role === 'gestionnaire' || role === 'admin') && (
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <div className="flex space-x-2">
-                                <button className="text-blue-600 hover:text-blue-900">
-                                  <Eye className="h-4 w-4" />
-                                </button>
-                                <button className="text-gray-600 hover:text-gray-900">
-                                  <Settings className="h-4 w-4" />
-                                </button>
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
               </div>
             </div>
           </div>
@@ -853,11 +1169,8 @@ const Dashboard = () => {
 
               {/* Statistiques par type de capteur */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-                {['temperature', 'air_quality', 'noise', 'traffic', 'humidity'].map(type => {
-                  const typeSensors = sensorData.filter(s => s.type === type);
-                  const avgValue = typeSensors.length > 0
-                    ? typeSensors.reduce((acc, s) => acc + s.value, 0) / typeSensors.length
-                    : 0;
+                {['temperature', 'air_quality', 'noise', 'traffic', 'humidity', 'pollution'].map(type => {
+                  const typeSensors = realSensors.filter(s => s.type === type);
 
                   return (
                     <div key={type} className="bg-gray-50 rounded-lg p-4">
@@ -868,10 +1181,10 @@ const Dashboard = () => {
                         </span>
                       </div>
                       <div className="text-2xl font-bold text-gray-900">
-                        {avgValue.toFixed(1)}
+                        {typeSensors.length}
                       </div>
                       <div className="text-sm text-gray-600">
-                        {typeSensors.length} capteurs actifs
+                        capteurs installés
                       </div>
                     </div>
                   );
@@ -880,28 +1193,99 @@ const Dashboard = () => {
             </div>
           </div>
         )}
-      </div>
 
-      {/* Vue Gestion des Capteurs */}
-      {currentView === 'sensors' && (role === 'gestionnaire' || role === 'admin') && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Gestion des Capteurs IoT</h3>
-                <p className="text-gray-600">Gérez les capteurs de la smart city</p>
+        {/* Vue Gestion des Capteurs */}
+        {currentView === 'sensors' && (role === 'gestionnaire' || role === 'admin') && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Gestion des Capteurs IoT</h3>
+                  <p className="text-gray-600">Gérez les capteurs de la smart city</p>
+                </div>
+                <button
+                  onClick={handleAddSensor}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200 flex items-center"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter un capteur
+                </button>
               </div>
-              <button
-                onClick={() => setShowSensorCRUDModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200 flex items-center"
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Ouvrir la gestion
-              </button>
+
+              {/* Statistiques rapides */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="text-blue-600 text-sm font-medium">Total</div>
+                  <div className="text-2xl font-bold text-blue-900">{realSensors.length}</div>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <div className="text-green-600 text-sm font-medium">Actifs</div>
+                  <div className="text-2xl font-bold text-green-900">
+                    {realSensors.filter(s => s.status === 'actif').length}
+                  </div>
+                </div>
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <div className="text-yellow-600 text-sm font-medium">Maintenance</div>
+                  <div className="text-2xl font-bold text-yellow-900">
+                    {realSensors.filter(s => s.status === 'maintenance').length}
+                  </div>
+                </div>
+                <div className="bg-red-50 p-4 rounded-lg">
+                  <div className="text-red-600 text-sm font-medium">Inactifs</div>
+                  <div className="text-2xl font-bold text-red-900">
+                    {realSensors.filter(s => s.status === 'inactif').length}
+                  </div>
+                </div>
+              </div>
+
+              {/* Liste des capteurs avec actions */}
+              <div className="mt-6">
+                <h4 className="text-md font-semibold text-gray-900 mb-4">Liste des Capteurs</h4>
+                <div className="grid grid-cols-1 gap-4">
+                  {realSensors.slice(0, 10).map((sensor) => (
+                    <div key={sensor.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-2">
+                            {getSensorIcon(sensor.type)}
+                            <div>
+                              <div className="font-medium text-gray-900">{sensor.name}</div>
+                              <div className="text-sm text-gray-500">
+                                {getSensorLabel(sensor.type)} • {sensor.location}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(sensor.status)}`}>
+                            {sensor.status === 'actif' ? 'Actif' :
+                              sensor.status === 'maintenance' ? 'Maintenance' : 'Inactif'}
+                          </span>
+                          <SensorActionsMenu 
+                            sensor={sensor}
+                            onEdit={handleEditSensor}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {realSensors.length > 10 && (
+                  <div className="mt-4 text-center">
+                    <button
+                      onClick={() => setCurrentView('sensors')}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                    >
+                      Voir tous les capteurs ({realSensors.length})
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Modal d'export */}
       {showExportModal && (
@@ -962,29 +1346,13 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Modal d'ajout de capteur */}
-      {showAddSensorModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Ajouter un capteur</h3>
-            <p className="text-gray-600 mb-6">Fonctionnalité en cours de développement.</p>
-            <button
-              onClick={() => setShowAddSensorModal(false)}
-              className="w-full px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
-            >
-              Fermer
-            </button>
-          </div>
-        </div>
-      )}
-      {/* Modal CRUD des capteurs */}
+      {/* Modal CRUD des capteurs - INTÉGRÉ */}
       <SensorCRUDModal
         isOpen={showSensorCRUDModal}
         onClose={() => setShowSensorCRUDModal(false)}
-        onSensorChange={() => {
-          // Rafraîchir les données si nécessaire
-          console.log('Capteurs mis à jour');
-        }}
+        sensor={selectedSensor}
+        mode={crudMode}
+        onSensorChange={handleSensorChange}
       />
     </div>
   );

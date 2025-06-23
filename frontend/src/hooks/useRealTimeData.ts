@@ -38,31 +38,31 @@ export const useRealTimeData = (refreshInterval = 30000) => {
         if (value > 150) return 'critical';
         if (value > 100) return 'warning';
         return 'normal';
-      
+
       case 'noise':
         if (value > 75) return 'critical';
         if (value > 65) return 'warning';
         return 'normal';
-      
+
       case 'temperature':
         if (value < 10 || value > 35) return 'critical';
         if (value < 15 || value > 30) return 'warning';
         return 'normal';
-      
+
       case 'humidity':
         if (value < 30 || value > 80) return 'warning';
         return 'normal';
-      
+
       case 'traffic':
         if (value > 300) return 'critical';
         if (value > 200) return 'warning';
         return 'normal';
-      
+
       case 'pollution':
         if (value > 0.08) return 'critical';
         if (value > 0.05) return 'warning';
         return 'normal';
-      
+
       default:
         return 'normal';
     }
@@ -72,22 +72,22 @@ export const useRealTimeData = (refreshInterval = 30000) => {
   const loadData = async () => {
     try {
       setError(null);
-      
+
       // Charger les capteurs
       const sensorsData = await getSensors();
       setSensors(sensorsData);
 
       // Charger les données récentes de chaque capteur
       const allSensorData: ProcessedSensorData[] = [];
-      
+
       for (const sensor of sensorsData) {
         try {
           const { data } = await getSensorData(sensor.id, { limit: 1 }); // Dernière mesure
-          
+
           if (data && data.length > 0) {
             const latestData = data[0];
             const status = determineStatus(sensor.type, latestData.value);
-            
+
             allSensorData.push({
               id: `${sensor.id}-${latestData.id}`,
               sensor_id: sensor.id,
@@ -124,7 +124,7 @@ export const useRealTimeData = (refreshInterval = 30000) => {
       setAlerts(processedAlerts);
       setLastUpdate(new Date());
       setLoading(false);
-      
+
     } catch (err) {
       console.error('Erreur lors du chargement des données:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
@@ -137,7 +137,7 @@ export const useRealTimeData = (refreshInterval = 30000) => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
-    
+
     intervalRef.current = setInterval(loadData, refreshInterval);
   };
 

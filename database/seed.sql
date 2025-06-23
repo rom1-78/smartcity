@@ -30,19 +30,19 @@ INSERT INTO users (first_name, last_name, email, password, role, organization, c
 -- 2. CAPTEURS
 -- ============================================
 INSERT INTO sensors (name, type, location, latitude, longitude, status, installed_at) VALUES
--- Capteurs de qualité de l'air
+-- Capteurs de air_quality
 ('Air-Centre-001', 'air_quality', 'Place de la République', 48.8566, 2.3522, 'actif', '2024-01-15'),
 ('Air-Nord-002', 'air_quality', 'Avenue du Général de Gaulle', 48.8680, 2.3420, 'actif', '2024-01-20'),
 ('Air-Sud-003', 'air_quality', 'Zone Industrielle Sud', 48.8420, 2.3650, 'maintenance', '2024-01-25'),
 ('Air-Est-004', 'air_quality', 'Quartier Résidentiel Est', 48.8590, 2.3780, 'actif', '2024-02-01'),
 ('Air-Ouest-005', 'air_quality', 'Centre Commercial Ouest', 48.8540, 2.3200, 'actif', '2024-02-05'),
 
--- Capteurs de bruit
-('Bruit-Centre-001', 'noise', 'Place de la République', 48.8566, 2.3522, 'actif', '2024-01-15'),
-('Bruit-Ecole-002', 'noise', 'École Primaire Nord', 48.8650, 2.3450, 'actif', '2024-01-22'),
-('Bruit-Autoroute-003', 'noise', 'Proximité A86', 48.8320, 2.3800, 'actif', '2024-01-28'),
-('Bruit-Hopital-004', 'noise', 'Hôpital Central', 48.8610, 2.3350, 'inactif', '2024-02-03'),
-('Bruit-Parc-005', 'noise', 'Parc Municipal', 48.8580, 2.3680, 'actif', '2024-02-08'),
+-- Capteurs de noise
+('noise-Centre-001', 'noise', 'Place de la République', 48.8566, 2.3522, 'actif', '2024-01-15'),
+('noise-Ecole-002', 'noise', 'École Primaire Nord', 48.8650, 2.3450, 'actif', '2024-01-22'),
+('noise-Autoroute-003', 'noise', 'Proximité A86', 48.8320, 2.3800, 'actif', '2024-01-28'),
+('noise-Hopital-004', 'noise', 'Hôpital Central', 48.8610, 2.3350, 'inactif', '2024-02-03'),
+('noise-Parc-005', 'noise', 'Parc Municipal', 48.8580, 2.3680, 'actif', '2024-02-08'),
 
 -- Capteurs de température
 ('Temp-Centre-001', 'temperature', 'Hôtel de Ville', 48.8566, 2.3522, 'actif', '2024-01-15'),
@@ -70,7 +70,7 @@ INSERT INTO sensors (name, type, location, latitude, longitude, status, installe
 -- 3. DONNÉES DES CAPTEURS (sensor_data)
 -- ============================================
 
--- Données pour les capteurs de qualité de l'air (PM2.5 en µg/m³)
+-- Données pour les capteurs de air_quality (PM2.5 en µg/m³)
 INSERT INTO sensor_data (sensor_id, value, unit, timestamp) VALUES
 -- Capteur Air-Centre-001
 (1, 28.5, 'µg/m³', '2025-06-17 00:00:00'),
@@ -96,8 +96,8 @@ INSERT INTO sensor_data (sensor_id, value, unit, timestamp) VALUES
 (2, 44.3, 'µg/m³', '2025-06-17 08:00:00'),
 (2, 39.6, 'µg/m³', '2025-06-17 09:00:00'),
 
--- Données pour les capteurs de bruit (en dB)
--- Capteur Bruit-Centre-001
+-- Données pour les capteurs de noise (en dB)
+-- Capteur noise-Centre-001
 (6, 65.2, 'dB', '2025-06-17 00:00:00'),
 (6, 58.7, 'dB', '2025-06-17 01:00:00'),
 (6, 52.4, 'dB', '2025-06-17 02:00:00'),
@@ -109,7 +109,7 @@ INSERT INTO sensor_data (sensor_id, value, unit, timestamp) VALUES
 (6, 75.3, 'dB', '2025-06-17 08:00:00'),
 (6, 68.7, 'dB', '2025-06-17 09:00:00'),
 
--- Capteur Bruit-Ecole-002
+-- Capteur noise-Ecole-002
 (7, 45.2, 'dB', '2025-06-17 00:00:00'),
 (7, 42.8, 'dB', '2025-06-17 01:00:00'),
 (7, 39.5, 'dB', '2025-06-17 02:00:00'),
@@ -270,8 +270,8 @@ INSERT INTO suggestions (user_id, title, message, category, priority, admin_resp
 'Votre demande a été transmise au service technique. Une étude de faisabilité sera menée dans les 2 prochaines semaines. Nous vous tiendrons informé des résultats.', 
 '2025-06-15 14:30:00', '2025-06-16 09:15:00'),
 
-(11, 'Fausses alertes capteur bruit école', 
-'Le capteur de bruit près de l\'école primaire Nord semble dysfonctionner. Il envoie des alertes même pendant les weekends et vacances scolaires quand il n\'y a personne. Pourriez-vous vérifier son calibrage ?', 
+(11, 'Fausses alertes capteur noise école', 
+'Le capteur de noise près de l\'école primaire Nord semble dysfonctionner. Il envoie des alertes même pendant les weekends et vacances scolaires quand il n\'y a personne. Pourriez-vous vérifier son calibrage ?', 
 'sensor', 'medium', 
 'Merci pour votre signalement. Une équipe technique interviendra demain pour vérifier le capteur. Le problème semble lié à la sensibilité aux vibrations du bâtiment.', 
 '2025-06-14 16:45:00', '2025-06-15 10:30:00'),
@@ -291,7 +291,7 @@ NULL,
 (14, 'Capteur pollution près de la crèche', 
 'Je suis parent d\'élève à la crèche municipale et je m\'inquiète de la qualité de l\'air pour nos enfants. N\'y aurait-il pas moyen d\'installer un capteur de pollution spécifiquement près de la crèche ?', 
 'location', 'high', 
-'Votre préoccupation est justifiée. Un capteur multi-paramètres (air, bruit, température) sera installé près de la crèche avant la rentrée de septembre. Installation prévue courant août.', 
+'Votre préoccupation est justifiée. Un capteur multi-paramètres (air, noise, température) sera installé près de la crèche avant la rentrée de septembre. Installation prévue courant août.', 
 '2025-06-10 09:30:00', '2025-06-11 15:20:00'),
 
 (15, 'Interface plus intuitive pour seniors', 
@@ -376,7 +376,7 @@ NULL,
 -- Ajout de plus de données historiques pour les graphiques
 INSERT INTO sensor_data (sensor_id, value, unit, timestamp) VALUES
 -- Données de la semaine dernière pour tendances
--- Air Quality données (sensor_id = 1)
+-- air_quality données (sensor_id = 1)
 (1, 22.3, 'µg/m³', '2025-06-10 08:00:00'),
 (1, 26.7, 'µg/m³', '2025-06-10 14:00:00'),
 (1, 31.2, 'µg/m³', '2025-06-10 18:00:00'),

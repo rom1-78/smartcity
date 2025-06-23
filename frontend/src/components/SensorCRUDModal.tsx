@@ -1,11 +1,11 @@
 // frontend/src/components/SensorCRUDModal.tsx
 import React, { useState, useEffect } from 'react';
-import { 
-  getSensors, 
-  createSensor, 
-  updateSensor, 
-  deleteSensor, 
-  Sensor 
+import {
+  getSensors,
+  createSensor,
+  updateSensor,
+  deleteSensor,
+  Sensor
 } from '../services/sensor';
 import {
   MapPin,
@@ -26,16 +26,16 @@ interface SensorCRUDModalProps {
   onSensorChange?: () => void;
 }
 
-const SensorCRUDModal: React.FC<SensorCRUDModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  onSensorChange 
+const SensorCRUDModal: React.FC<SensorCRUDModalProps> = ({
+  isOpen,
+  onClose,
+  onSensorChange
 }) => {
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  
+
   // États pour le formulaire
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingSensor, setEditingSensor] = useState<Sensor | null>(null);
@@ -118,7 +118,7 @@ const SensorCRUDModal: React.FC<SensorCRUDModalProps> = ({
 
     try {
       setLoading(true);
-      
+
       const sensorData = {
         ...formData,
         latitude: formData.latitude ? parseFloat(formData.latitude) : undefined,
@@ -228,7 +228,7 @@ const SensorCRUDModal: React.FC<SensorCRUDModalProps> = ({
               <h4 className="text-lg font-medium text-gray-900 mb-4">
                 {editingSensor ? 'Modifier le Capteur' : 'Nouveau Capteur'}
               </h4>
-              
+
               <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -343,7 +343,7 @@ const SensorCRUDModal: React.FC<SensorCRUDModalProps> = ({
                     <Save className="h-4 w-4" />
                     <span>{editingSensor ? 'Mettre à jour' : 'Créer'}</span>
                   </button>
-                  
+
                   <button
                     type="button"
                     onClick={resetForm}

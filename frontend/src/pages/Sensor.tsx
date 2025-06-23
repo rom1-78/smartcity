@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Settings, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Eye, 
-  X, 
+import {
+  Settings,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  X,
   Save,
   MapPin,
   Activity,
@@ -80,7 +80,7 @@ const SensorManagement: React.FC = () => {
           },
           {
             id: 2,
-            name: 'Capteur Bruit Nord',
+            name: 'Capteur noise Nord',
             type: 'noise',
             location: 'Quartier Nord',
             status: 'actif',

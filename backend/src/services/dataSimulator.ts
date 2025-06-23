@@ -195,7 +195,7 @@ class IoTDataSimulator {
                     name: sensorRow.name as string,
                     location: sensorRow.location as string
                 };
-                 const delay = index * 1000; // Décalage de 1 seconde entre chaque capteur
+                const delay = index * 1000; // Décalage de 1 seconde entre chaque capteur
 
                 // setTimeout(() => {
                 //     // Simulation immédiate
@@ -297,8 +297,10 @@ class IoTDataSimulator {
 
             const testSensors = [
                 { name: 'Capteur Température Centre-ville', type: 'temperature', location: 'Place de la République', lat: 48.8566, lng: 2.3522 },
-                { name: 'Station Air Quartier Nord', type: 'air_quality', location: 'Avenue des Champs', lat: 48.8848, lng: 2.3504 },
-                { name: 'Mesure Bruit Zone Sud', type: 'noise', location: 'Rue de la Paix', lat: 48.8322, lng: 2.3509 },
+                {
+                    name: 'Station Air Quartier Nord', type: 'air_quality', location: 'Avenue des Champs', lat: 48.8848, lng: 2.3504
+                },
+                { name: 'Mesure noise Zone Sud', type: 'noise', location: 'Rue de la Paix', lat: 48.8322, lng: 2.3509 },
                 { name: 'Compteur Trafic Est', type: 'traffic', location: 'Boulevard de l\'Est', lat: 48.8534, lng: 2.3776 },
                 { name: 'Humidité Parc Central', type: 'humidity', location: 'Parc Central', lat: 48.8629, lng: 2.3397 },
                 { name: 'Pollution Industrielle', type: 'pollution', location: 'Zone Industrielle', lat: 48.8456, lng: 2.3892 }

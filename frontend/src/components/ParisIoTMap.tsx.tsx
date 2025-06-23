@@ -30,7 +30,7 @@ interface SensorData {
 const SimpleMapWithDB: React.FC = () => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
-  
+
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -55,17 +55,17 @@ const SimpleMapWithDB: React.FC = () => {
     try {
       console.log('🔄 Chargement des capteurs...');
       const data = await apiCall('http://localhost:5000/api/sensors');
-      
+
       // Filtrer uniquement ceux avec coordonnées valides
-      const validSensors = data.filter((s: Sensor) => 
-        s.latitude && s.longitude && 
+      const validSensors = data.filter((s: Sensor) =>
+        s.latitude && s.longitude &&
         s.latitude !== 0 && s.longitude !== 0
       );
-      
+
       setSensors(validSensors);
       setError('');
       console.log('✅ Capteurs chargés:', validSensors.length);
-      
+
     } catch (err: any) {
       console.error('❌ Erreur capteurs:', err);
       setError(`Erreur: ${err.message}`);
@@ -77,13 +77,13 @@ const SimpleMapWithDB: React.FC = () => {
     try {
       setLoadingData(true);
       console.log('🔄 Chargement données capteur:', sensorId);
-      
+
       // Récupérer les 10 dernières mesures du capteur
       const data = await apiCall(`http://localhost:5000/api/sensors/${sensorId}/data?limit=10`);
-      
+
       setSelectedSensorData(data);
       console.log('✅ Données capteur chargées:', data.length);
-      
+
     } catch (err: any) {
       console.error('❌ Erreur données capteur:', err);
       setSelectedSensorData([]);
@@ -97,10 +97,10 @@ const SimpleMapWithDB: React.FC = () => {
     const initMap = async () => {
       try {
         console.log('🚀 Init carte...');
-        
+
         // 1. Charger les capteurs
         await loadSensors();
-        
+
         // 2. Charger CSS Leaflet
         if (!document.querySelector('link[href*="leaflet"]')) {
           const link = document.createElement('link');
@@ -115,12 +115,12 @@ const SimpleMapWithDB: React.FC = () => {
           const script = document.createElement('script');
           script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
           document.head.appendChild(script);
-          
+
           await new Promise((resolve, reject) => {
             script.onload = resolve;
             script.onerror = reject;
           });
-          
+
           await new Promise(resolve => setTimeout(resolve, 500));
         }
 
@@ -130,14 +130,14 @@ const SimpleMapWithDB: React.FC = () => {
 
         // 4. Créer carte simple
         const map = window.L.map(mapRef.current).setView([48.8566, 2.3522], 12);
-        
+
         window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap'
         }).addTo(map);
 
         mapInstanceRef.current = map;
         console.log('✅ Carte créée');
-        
+
       } catch (err: any) {
         console.error('❌ Erreur init:', err);
         setError(err.message);
@@ -253,7 +253,7 @@ const SimpleMapWithDB: React.FC = () => {
 
       try {
         const data = await apiCall(`http://localhost:5000/api/sensors/${sensorId}/data?limit=5`);
-        
+
         if (data.length === 0) {
           dataDiv.innerHTML = '<div style="color: #666; text-align: center;">Aucune donnée disponible</div>';
           return;
@@ -262,7 +262,7 @@ const SimpleMapWithDB: React.FC = () => {
         // Afficher les 5 dernières mesures
         let html = '<div style="border-top: 1px solid #e5e7eb; padding-top: 10px; margin-top: 10px;">';
         html += '<h4 style="margin: 0 0 8px 0; color: #374151;">📈 Dernières mesures:</h4>';
-        
+
         data.forEach((measurement: SensorData, index: number) => {
           const date = new Date(measurement.timestamp).toLocaleString('fr-FR');
           html += `
@@ -282,7 +282,7 @@ const SimpleMapWithDB: React.FC = () => {
             </div>
           `;
         });
-        
+
         html += '</div>';
         dataDiv.innerHTML = html;
 
@@ -308,8 +308,8 @@ const SimpleMapWithDB: React.FC = () => {
       <div className="bg-white p-4 rounded-lg shadow border">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">🗺️ Carte IoT connectée à la BDD</h2>
-          <button 
-            onClick={() => window.location.reload()} 
+          <button
+            onClick={() => window.location.reload()}
             className="px-3 py-2 bg-blue-600 text-white rounded flex items-center gap-2"
           >
             <RefreshCw size={16} />
@@ -354,7 +354,7 @@ const SimpleMapWithDB: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div 
+          <div
             ref={mapRef}
             style={{
               height: '500px',
@@ -366,21 +366,9 @@ const SimpleMapWithDB: React.FC = () => {
         )}
       </div>
 
-      {/* Instructions */}
-      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-        <h3 className="text-blue-900 font-semibold mb-2">💡 Comment utiliser :</h3>
-        <ul className="text-blue-800 text-sm space-y-1">
-          <li>• Cliquez sur un marqueur pour voir les infos du capteur</li>
-          <li>• Cliquez sur "📊 Voir les données" pour charger les mesures depuis sensor_data</li>
-          <li>• Les données s'affichent directement dans la popup</li>
-          <li>• Les capteurs proviennent de votre table 'sensors'</li>
-          <li>• Les mesures proviennent de votre table 'sensor_data'</li>
-        </ul>
-      </div>
-
       {/* Debug */}
       <div className="bg-gray-100 p-3 rounded text-xs text-gray-600">
-        🔧 Debug: {sensors.length} capteurs | Loading: {loading ? 'Oui' : 'Non'} | 
+        🔧 Debug: {sensors.length} capteurs | Loading: {loading ? 'Oui' : 'Non'} |
         Leaflet: {typeof window !== 'undefined' && window.L ? 'Chargé' : 'Non chargé'}
       </div>
     </div>

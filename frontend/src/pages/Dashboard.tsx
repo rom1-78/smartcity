@@ -11,6 +11,8 @@ import {
   deleteSensor
 } from "../services/sensor";
 
+// IMPORT DES LABELS FRANÇAIS
+import { getSensorLabel } from '../utils/labels';
 import {
   MapPin,
   Thermometer,
@@ -34,6 +36,13 @@ import {
   Eye,
   MessageSquare,
   PlusCircle,
+  Plus, 
+  Edit, 
+  Trash2, 
+  Save, 
+  X, 
+  AlertCircle,
+  MapPin as SensorIcon,
   FileText
 } from 'lucide-react';
 
@@ -133,7 +142,9 @@ const Dashboard = () => {
     const generateMockData = () => {
       const types = ['temperature', 'air_quality', 'noise', 'traffic', 'humidity'];
       const locations = ['Centre-ville', 'Quartier Nord', 'Zone Sud', 'Secteur Est', 'Banlieue Ouest'];
-      const units = { temperature: '°C', air_quality: 'µg/m³', noise: 'dB', traffic: 'véh/h', humidity: '%' };
+      const units = {
+        temperature: '°C', air_quality: 'µg/m³', noise: 'dB', traffic: 'véh/h', humidity: '%'
+      };
 
       const mockSensors: SensorData[] = [];
       for (let i = 1; i <= 74; i++) {
@@ -186,12 +197,12 @@ const Dashboard = () => {
 
       setSensorData(mockSensors);
 
-      // Générer quelques alertes
+      // Générer quelques alertes - MODIFIÉ AVEC LABELS FRANÇAIS
       const criticalSensors = mockSensors.filter(s => s.status === 'critical');
       const mockAlerts: Alert[] = criticalSensors.slice(0, 3).map((sensor, index) => ({
         id: (index + 1).toString(),
         type: 'critical' as const,
-        message: `Niveau ${sensor.type.replace('_', ' ')} critique détecté`,
+        message: `Niveau ${getSensorLabel(sensor.type).toLowerCase()} critique détecté`,
         timestamp: new Date(),
         location: sensor.location
       }));
@@ -420,8 +431,8 @@ const Dashboard = () => {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             {getSensorIcon(sensor.type)}
-                            <span className="ml-2 text-sm font-medium text-gray-900 capitalize">
-                              {sensor.type.replace('_', ' ')}
+                            <span className="ml-2 text-sm font-medium text-gray-900">
+                              {getSensorLabel(sensor.type)}
                             </span>
                           </div>
                         </td>
@@ -592,7 +603,7 @@ const Dashboard = () => {
                             {getSensorIcon(sensor.type)}
                             <div>
                               <p className="text-sm font-medium text-yellow-800">
-                                {sensor.type.replace('_', ' ')}
+                                {getSensorLabel(sensor.type)}
                               </p>
                               <p className="text-xs text-yellow-600">{sensor.location}</p>
                             </div>
@@ -708,11 +719,11 @@ const Dashboard = () => {
                     className="border border-gray-300 rounded-md px-3 py-1 text-sm"
                   >
                     <option value="all">Tous les types</option>
-                    <option value="temperature">Température</option>
-                    <option value="air_quality">Qualité de l'air</option>
-                    <option value="noise">Niveau sonore</option>
-                    <option value="traffic">Circulation</option>
-                    <option value="humidity">Humidité</option>
+                    <option value="temperature">{getSensorLabel('temperature')}</option>
+                    <option value="air_quality">{getSensorLabel('air_quality')}</option>
+                    <option value="noise">{getSensorLabel('noise')}</option>
+                    <option value="traffic">{getSensorLabel('traffic')}</option>
+                    <option value="humidity">{getSensorLabel('humidity')}</option>
                   </select>
                 </div>
               </div>
@@ -787,8 +798,8 @@ const Dashboard = () => {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               {getSensorIcon(sensor.type)}
-                              <span className="ml-2 text-sm font-medium text-gray-900 capitalize">
-                                {sensor.type.replace('_', ' ')}
+                              <span className="ml-2 text-sm font-medium text-gray-900">
+                                {getSensorLabel(sensor.type)}
                               </span>
                             </div>
                           </td>
@@ -847,8 +858,8 @@ const Dashboard = () => {
                     <div key={type} className="bg-gray-50 rounded-lg p-4">
                       <div className="flex items-center mb-2">
                         {getSensorIcon(type)}
-                        <span className="ml-2 font-medium text-gray-900 capitalize">
-                          {type.replace('_', ' ')}
+                        <span className="ml-2 font-medium text-gray-900">
+                          {getSensorLabel(type)}
                         </span>
                       </div>
                       <div className="text-2xl font-bold text-gray-900">

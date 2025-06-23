@@ -54,17 +54,36 @@ const SimpleMapWithDB: React.FC = () => {
   const loadSensors = async () => {
     try {
       console.log('🔄 Chargement des capteurs...');
-      const data = await apiCall('http://localhost:5000/api/sensors');
+      const response = await apiCall('http://localhost:5000/api/sensors');
+
+      console.log('📊 Réponse API complète:', response);
+      
+      // 🔧 CORRECTION: Extraire les capteurs de la réponse
+      // L'API peut retourner soit un tableau direct, soit un objet avec propriété 'sensors'
+      let sensors: Sensor[] = [];
+      
+      if (Array.isArray(response)) {
+        // Format: [sensor1, sensor2, ...]
+        sensors = response;
+      } else if (response && Array.isArray(response.sensors)) {
+        // Format: {sensors: [sensor1, sensor2, ...], total: X}
+        sensors = response.sensors;
+      } else {
+        console.error('❌ Format de réponse invalide:', response);
+        throw new Error('Format de données invalide');
+      }
+
+      console.log('📡 Capteurs extraits:', sensors.length);
 
       // Filtrer uniquement ceux avec coordonnées valides
-      const validSensors = data.filter((s: Sensor) =>
+      const validSensors = sensors.filter((s: Sensor) =>
         s.latitude && s.longitude &&
         s.latitude !== 0 && s.longitude !== 0
       );
 
       setSensors(validSensors);
       setError('');
-      console.log('✅ Capteurs chargés:', validSensors.length);
+      console.log('✅ Capteurs valides chargés:', validSensors.length);
 
     } catch (err: any) {
       console.error('❌ Erreur capteurs:', err);
@@ -79,10 +98,12 @@ const SimpleMapWithDB: React.FC = () => {
       console.log('🔄 Chargement données capteur:', sensorId);
 
       // Récupérer les 10 dernières mesures du capteur
-      const data = await apiCall(`http://localhost:5000/api/sensors/${sensorId}/data?limit=10`);
-
-      setSelectedSensorData(data);
-      console.log('✅ Données capteur chargées:', data.length);
+      const response = await apiCall(`http://localhost:5000/api/sensors/${sensorId}/data?limit=10`);
+      
+      // 🔧 CORRECTION: Gérer la structure de réponse
+      const sensorData = response.data || response;
+      setSelectedSensorData(Array.isArray(sensorData) ? sensorData : []);
+      console.log('✅ Données capteur chargées:', sensorData.length);
 
     } catch (err: any) {
       console.error('❌ Erreur données capteur:', err);
@@ -186,110 +207,113 @@ const SimpleMapWithDB: React.FC = () => {
       }
     };
 
-    // Créer marqueurs
-    const bounds = window.L.latLngBounds([]);
+    // Ajouter chaque capteur
+    sensors.forEach((sensor) => {
+      if (!sensor.latitude || !sensor.longitude) return;
 
-    sensors.forEach(sensor => {
-      const icon = getIcon(sensor.type);
-      const color = getColor(sensor.status);
+      // Créer icône HTML
+      const divIcon = window.L.divIcon({
+        html: `
+          <div style="
+            background: ${getColor(sensor.status)};
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          ">
+            ${getIcon(sensor.type)}
+          </div>
+        `,
+        className: 'custom-div-icon',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+      });
 
-      // Popup de base avec infos capteur
+      // Ajouter marqueur
+      const marker = window.L.marker([sensor.latitude, sensor.longitude], {
+        icon: divIcon
+      }).addTo(map);
+
+      // Popup avec infos
       const popupContent = `
-        <div style="font-family: sans-serif; min-width: 250px;">
-          <h3 style="margin: 0 0 10px 0; color: #1f2937;">
-            ${icon} ${sensor.name}
+        <div style="min-width: 200px; font-family: Arial;">
+          <h3 style="margin: 0 0 8px 0; color: #1f2937; font-size: 16px;">
+            ${getIcon(sensor.type)} ${sensor.name}
           </h3>
           <div style="margin-bottom: 8px;">
-            <strong>Type:</strong> ${sensor.type}
-          </div>
-          <div style="margin-bottom: 8px;">
-            <strong>Localisation:</strong> ${sensor.location}
-          </div>
-          <div style="margin-bottom: 8px;">
+            <strong>Type:</strong> ${sensor.type}<br>
+            <strong>Lieu:</strong> ${sensor.location}<br>
             <strong>Statut:</strong> 
-            <span style="color: ${color}; font-weight: bold;">${sensor.status}</span>
+            <span style="color: ${getColor(sensor.status)}; font-weight: bold;">
+              ${sensor.status}
+            </span>
           </div>
-          <div style="margin-bottom: 12px; font-size: 12px; color: #666;">
-            Installé le: ${new Date(sensor.installed_at).toLocaleDateString('fr-FR')}
-          </div>
-          <button 
-            onclick="window.loadSensorData(${sensor.id})" 
-            style="
-              background: #2563eb; 
-              color: white; 
-              border: none; 
-              padding: 8px 16px; 
-              border-radius: 4px; 
-              cursor: pointer;
-              width: 100%;
-            "
-          >
-            📊 Voir les données
-          </button>
-          <div id="sensor-data-${sensor.id}" style="margin-top: 10px;">
-            <!-- Les données apparaîtront ici -->
+          <div id="sensor-data-${sensor.id}" style="
+            background: #f9fafb; 
+            padding: 8px; 
+            border-radius: 4px; 
+            margin-top: 8px;
+            border-left: 3px solid ${getColor(sensor.status)};
+          ">
+            <em>Cliquez pour charger les données...</em>
           </div>
         </div>
       `;
 
-      const marker = window.L.marker([sensor.latitude, sensor.longitude])
-        .bindPopup(popupContent, { maxWidth: 350 })
-        .addTo(map);
+      marker.bindPopup(popupContent, { maxWidth: 300 });
 
-      bounds.extend([sensor.latitude, sensor.longitude]);
-    });
+      // Charger données au clic
+      marker.on('popupopen', async () => {
+        const dataDiv = document.getElementById(`sensor-data-${sensor.id}`);
+        if (!dataDiv) return;
 
-    // Ajuster vue
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [20, 20] });
-    }
+        dataDiv.innerHTML = '<div style="color: #6b7280;">⏳ Chargement...</div>';
 
-    // Fonction globale pour charger données (appelée depuis popup)
-    (window as any).loadSensorData = async (sensorId: number) => {
-      const dataDiv = document.getElementById(`sensor-data-${sensorId}`);
-      if (!dataDiv) return;
+        try {
+          await loadSensorData(sensor.id);
+          
+          if (selectedSensorData.length === 0) {
+            dataDiv.innerHTML = '<div style="color: #9ca3af;">📊 Aucune donnée disponible</div>';
+            return;
+          }
 
-      dataDiv.innerHTML = '<div style="text-align: center; color: #666;">⏳ Chargement...</div>';
+          let html = '<div style="font-size: 12px;">';
+          html += '<strong style="color: #374151;">Dernières mesures:</strong><br>';
+          
+          selectedSensorData.slice(0, 3).forEach((measurement, index) => {
+            const date = new Date(measurement.timestamp).toLocaleString('fr-FR');
+            html += `
+              <div style="
+                background: ${index === 0 ? '#f0f9ff' : '#f9fafb'}; 
+                padding: 6px 8px; 
+                margin-bottom: 4px; 
+                border-radius: 4px;
+                border-left: 3px solid ${index === 0 ? '#2563eb' : '#d1d5db'};
+              ">
+                <div style="font-weight: bold; color: #1f2937;">
+                  ${measurement.value} ${measurement.unit}
+                </div>
+                <div style="font-size: 11px; color: #6b7280;">
+                  ${date}
+                </div>
+              </div>
+            `;
+          });
 
-      try {
-        const data = await apiCall(`http://localhost:5000/api/sensors/${sensorId}/data?limit=5`);
+          html += '</div>';
+          dataDiv.innerHTML = html;
 
-        if (data.length === 0) {
-          dataDiv.innerHTML = '<div style="color: #666; text-align: center;">Aucune donnée disponible</div>';
-          return;
+        } catch (err) {
+          dataDiv.innerHTML = '<div style="color: #dc2626;">❌ Erreur chargement données</div>';
         }
-
-        // Afficher les 5 dernières mesures
-        let html = '<div style="border-top: 1px solid #e5e7eb; padding-top: 10px; margin-top: 10px;">';
-        html += '<h4 style="margin: 0 0 8px 0; color: #374151;">📈 Dernières mesures:</h4>';
-
-        data.forEach((measurement: SensorData, index: number) => {
-          const date = new Date(measurement.timestamp).toLocaleString('fr-FR');
-          html += `
-            <div style="
-              background: ${index === 0 ? '#f0f9ff' : '#f9fafb'}; 
-              padding: 6px 8px; 
-              margin-bottom: 4px; 
-              border-radius: 4px;
-              border-left: 3px solid ${index === 0 ? '#2563eb' : '#d1d5db'};
-            ">
-              <div style="font-weight: bold; color: #1f2937;">
-                ${measurement.value} ${measurement.unit}
-              </div>
-              <div style="font-size: 11px; color: #6b7280;">
-                ${date}
-              </div>
-            </div>
-          `;
-        });
-
-        html += '</div>';
-        dataDiv.innerHTML = html;
-
-      } catch (err) {
-        dataDiv.innerHTML = '<div style="color: #dc2626;">❌ Erreur chargement données</div>';
-      }
-    };
+      });
+    });
 
     console.log('✅ Marqueurs ajoutés');
   }, [sensors]);

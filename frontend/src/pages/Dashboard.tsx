@@ -3,6 +3,8 @@ import Navbar from "../components/Navbar";
 import ParisIoTMap from "../components/ParisIoTMap.tsx";  // NOUVEAU COMPOSANT
 // import TestMap from "../components/TestMap.tsx";
 import { isLoggedIn, removeToken, getUserFromToken } from "../services/auth";
+import SensorCRUDModal from "../components/SensorCRUDModal";
+
 import { useNavigate } from "react-router-dom";
 import {
   getSensors,
@@ -36,11 +38,11 @@ import {
   Eye,
   MessageSquare,
   PlusCircle,
-  Plus, 
-  Edit, 
-  Trash2, 
-  Save, 
-  X, 
+  Plus,
+  Edit,
+  Trash2,
+  Save,
+  X,
   AlertCircle,
   MapPin as SensorIcon,
   FileText
@@ -80,10 +82,12 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
 
   // États de l'interface
-  const [currentView, setCurrentView] = useState<'overview' | 'map' | 'data' | 'analytics'>('overview');
+  const [currentView, setCurrentView] = useState<'overview' | 'map' | 'data' | 'analytics' | 'sensors'>('overview');
   const [showExportModal, setShowExportModal] = useState(false);
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
   const [showAddSensorModal, setShowAddSensorModal] = useState(false);
+  const [showSensorCRUDModal, setShowSensorCRUDModal] = useState(false);
+
   const [newSuggestion, setNewSuggestion] = useState('');
 
   // États pour les filtres
@@ -297,7 +301,8 @@ const Dashboard = () => {
               { key: 'overview', label: 'Vue d\'ensemble', icon: BarChart3 },
               { key: 'map', label: 'Carte Interactive', icon: MapPin },
               { key: 'data', label: 'Données Détaillées', icon: Database },
-              { key: 'analytics', label: 'Analyses', icon: TrendingUp }
+              { key: 'analytics', label: 'Analyses', icon: TrendingUp },
+              ...(role === 'gestionnaire' || role === 'admin' ? [{ key: 'sensors', label: 'Gestion Capteurs', icon: Settings }] : [])
             ].map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -498,11 +503,11 @@ const Dashboard = () => {
                       Générer rapport
                     </button>
                     <button
-                      onClick={() => setShowAddSensorModal(true)}
-                      className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition duration-200 flex items-center justify-center"
+                      onClick={() => setShowSensorCRUDModal(true)}
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition duration-200 flex items-center justify-center"
                     >
-                      <Database className="h-5 w-5 mr-2" />
-                      Analyser données
+                      <Settings className="h-5 w-5 mr-2" />
+                      Gérer capteurs
                     </button>
                   </>
                 )}
@@ -877,6 +882,27 @@ const Dashboard = () => {
         )}
       </div>
 
+      {/* Vue Gestion des Capteurs */}
+      {currentView === 'sensors' && (role === 'gestionnaire' || role === 'admin') && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Gestion des Capteurs IoT</h3>
+                <p className="text-gray-600">Gérez les capteurs de la smart city</p>
+              </div>
+              <button
+                onClick={() => setShowSensorCRUDModal(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-200 flex items-center"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Ouvrir la gestion
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal d'export */}
       {showExportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -951,6 +977,15 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+      {/* Modal CRUD des capteurs */}
+      <SensorCRUDModal
+        isOpen={showSensorCRUDModal}
+        onClose={() => setShowSensorCRUDModal(false)}
+        onSensorChange={() => {
+          // Rafraîchir les données si nécessaire
+          console.log('Capteurs mis à jour');
+        }}
+      />
     </div>
   );
 };

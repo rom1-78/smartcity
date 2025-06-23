@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from "../components/Navbar";
-import ParisIoTMap from "../components/ParisIoTMap.tsx";
+import Map from "../components/Map.tsx";
 import { isLoggedIn, removeToken, getUserFromToken } from "../services/auth";
 import { useNavigate } from "react-router-dom";
 import {
@@ -60,6 +60,17 @@ interface SensorData {
   timestamp: Date;
 }
 
+// Types pour les données historiques des graphiques
+interface HistoricalData {
+  timestamp: string;
+  temperature: number;
+  air_quality: number;
+  noise: number;
+  traffic: number;
+  humidity: number;
+  pollution: number;
+}
+
 interface Alert {
   id: string;
   type: 'info' | 'warning' | 'critical';
@@ -97,12 +108,12 @@ interface SensorCRUDModalProps {
   onSensorChange: () => void;
 }
 
-const SensorCRUDModal: React.FC<SensorCRUDModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  sensor, 
-  mode, 
-  onSensorChange 
+const SensorCRUDModal: React.FC<SensorCRUDModalProps> = ({
+  isOpen,
+  onClose,
+  sensor,
+  mode,
+  onSensorChange
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -239,7 +250,7 @@ const SensorCRUDModal: React.FC<SensorCRUDModalProps> = ({
   // Supprimer un capteur
   const handleDelete = async () => {
     if (!sensor?.id) return;
-    
+
     if (!confirm(`Êtes-vous sûr de vouloir supprimer le capteur "${sensor.name}" ?`)) {
       return;
     }
@@ -250,7 +261,7 @@ const SensorCRUDModal: React.FC<SensorCRUDModalProps> = ({
     try {
       await apiCall(`http://localhost:5000/api/sensors/${sensor.id}`, 'DELETE');
       setSuccess('Capteur supprimé avec succès !');
-      
+
       onSensorChange();
 
       setTimeout(() => {
@@ -305,7 +316,7 @@ const SensorCRUDModal: React.FC<SensorCRUDModalProps> = ({
             <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
               📋 Informations du capteur
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Nom */}
               <div>
@@ -414,7 +425,7 @@ const SensorCRUDModal: React.FC<SensorCRUDModalProps> = ({
               </div>
             </div>
 
-            {/* Date d'installation (en lecture seule en mode ajout) */}
+            {/* Date d'installation */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Date d'installation
@@ -491,10 +502,10 @@ interface SensorActionsMenuProps {
   onViewDetails?: (sensor: RealSensor) => void;
 }
 
-const SensorActionsMenu: React.FC<SensorActionsMenuProps> = ({ 
-  sensor, 
-  onEdit, 
-  onViewDetails 
+const SensorActionsMenu: React.FC<SensorActionsMenuProps> = ({
+  sensor,
+  onEdit,
+  onViewDetails
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -549,6 +560,7 @@ const role = user?.role;
 const Dashboard = () => {
   // États principaux
   const [sensorData, setSensorData] = useState<SensorData[]>([]);
+  const [historicalData, setHistoricalData] = useState<HistoricalData[]>([]);
   const [realSensors, setRealSensors] = useState<RealSensor[]>([]);
   const [sensors, setSensors] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -561,7 +573,6 @@ const Dashboard = () => {
   const [currentView, setCurrentView] = useState<'overview' | 'map' | 'analytics' | 'sensors'>('overview');
   const [showExportModal, setShowExportModal] = useState(false);
   const [showSuggestionModal, setShowSuggestionModal] = useState(false);
-  const [showAddSensorModal, setShowAddSensorModal] = useState(false);
   const [showSensorCRUDModal, setShowSensorCRUDModal] = useState(false);
 
   // États pour le CRUD
@@ -569,14 +580,6 @@ const Dashboard = () => {
   const [selectedSensor, setSelectedSensor] = useState<RealSensor | undefined>();
 
   const [newSuggestion, setNewSuggestion] = useState('');
-
-  // États pour les filtres
-  const [dateFilter, setDateFilter] = useState({
-    start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
-  });
-  const [locationFilter, setLocationFilter] = useState('all');
-  const [sensorTypeFilter, setSensorTypeFilter] = useState('all');
 
   const navigate = useNavigate();
 
@@ -665,10 +668,10 @@ const Dashboard = () => {
   // Simulation de données de capteurs (gardé pour compatibilité)
   useEffect(() => {
     const generateMockData = () => {
-      const types = ['temperature', 'air_quality', 'noise', 'traffic', 'humidity'];
+      const types = ['temperature', 'air_quality', 'noise', 'traffic', 'humidity', 'pollution'];
       const locations = ['Centre-ville', 'Quartier Nord', 'Zone Sud', 'Secteur Est', 'Banlieue Ouest'];
       const units = {
-        temperature: '°C', air_quality: 'µg/m³', noise: 'dB', traffic: 'véh/h', humidity: '%'
+        temperature: '°C', air_quality: 'µg/m³', noise: 'dB', traffic: 'véh/h', humidity: '%', pollution: 'µg/m³'
       };
 
       const mockSensors: SensorData[] = [];
@@ -705,6 +708,11 @@ const Dashboard = () => {
             if (value > 80) status = 'critical';
             else if (value > 70) status = 'warning';
             break;
+          case 'pollution':
+            value = Math.random() * 100 + 20;
+            if (value > 80) status = 'critical';
+            else if (value > 60) status = 'warning';
+            break;
           default:
             value = Math.random() * 100;
         }
@@ -733,11 +741,68 @@ const Dashboard = () => {
       }));
 
       setAlerts(mockAlerts);
+
+      // Générer des données historiques pour les graphiques
+      generateHistoricalData(mockSensors);
     };
 
+    const generateHistoricalData = (currentSensors: SensorData[]) => {
+      const now = new Date();
+
+      // Calculer les moyennes actuelles par type
+      const averages = {
+        temperature: currentSensors.filter(s => s.type === 'temperature').reduce((acc, s) => acc + s.value, 0) / Math.max(1, currentSensors.filter(s => s.type === 'temperature').length),
+        air_quality: currentSensors.filter(s => s.type === 'air_quality').reduce((acc, s) => acc + s.value, 0) / Math.max(1, currentSensors.filter(s => s.type === 'air_quality').length),
+        noise: currentSensors.filter(s => s.type === 'noise').reduce((acc, s) => acc + s.value, 0) / Math.max(1, currentSensors.filter(s => s.type === 'noise').length),
+        traffic: currentSensors.filter(s => s.type === 'traffic').reduce((acc, s) => acc + s.value, 0) / Math.max(1, currentSensors.filter(s => s.type === 'traffic').length),
+        humidity: currentSensors.filter(s => s.type === 'humidity').reduce((acc, s) => acc + s.value, 0) / Math.max(1, currentSensors.filter(s => s.type === 'humidity').length),
+        pollution: currentSensors.filter(s => s.type === 'pollution').reduce((acc, s) => acc + s.value, 0) / Math.max(1, currentSensors.filter(s => s.type === 'pollution').length)
+      };
+
+      // Ajouter un nouveau point de données avec variation
+      const newDataPoint: HistoricalData = {
+        timestamp: now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        temperature: Math.round((averages.temperature + (Math.random() - 0.5) * 5) * 10) / 10,
+        air_quality: Math.round((averages.air_quality + (Math.random() - 0.5) * 10) * 10) / 10,
+        noise: Math.round((averages.noise + (Math.random() - 0.5) * 8) * 10) / 10,
+        traffic: Math.round((averages.traffic + (Math.random() - 0.5) * 50) * 10) / 10,
+        humidity: Math.round((averages.humidity + (Math.random() - 0.5) * 10) * 10) / 10,
+        pollution: Math.round((averages.pollution + (Math.random() - 0.5) * 15) * 10) / 10
+      };
+
+      setHistoricalData(prev => {
+        const updated = [...prev, newDataPoint];
+        // Garder seulement les 20 derniers points pour éviter une surcharge
+        return updated.slice(-20);
+      });
+    };
+
+    // Initialisation avec quelques points historiques
+    const initializeHistoricalData = () => {
+      const initialData: HistoricalData[] = [];
+      const baseTime = new Date();
+
+      for (let i = 19; i >= 0; i--) {
+        const time = new Date(baseTime.getTime() - i * 30000); // Points toutes les 30 secondes
+        initialData.push({
+          timestamp: time.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+          temperature: Math.round((20 + Math.random() * 15) * 10) / 10,
+          air_quality: Math.round((30 + Math.random() * 40) * 10) / 10,
+          noise: Math.round((50 + Math.random() * 30) * 10) / 10,
+          traffic: Math.round((100 + Math.random() * 200) * 10) / 10,
+          humidity: Math.round((40 + Math.random() * 40) * 10) / 10,
+          pollution: Math.round((25 + Math.random() * 50) * 10) / 10
+        });
+      }
+      setHistoricalData(initialData);
+    };
+
+    // Initialisation
+    initializeHistoricalData();
     generateMockData();
     setIsLoading(false);
 
+    // Mise à jour périodique toutes les 30 secondes
     const interval = setInterval(generateMockData, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -818,8 +883,8 @@ const Dashboard = () => {
             {[
               { key: 'overview', label: 'Vue d\'ensemble', icon: BarChart3 },
               { key: 'map', label: 'Carte Interactive', icon: MapPin },
-              { key: 'analytics', label: 'Analyses', icon: TrendingUp },
-              ...(role === 'gestionnaire' || role === 'admin' ? [{ key: 'sensors', label: 'Gestion Capteurs', icon: Settings }] : [])
+              ...(role === 'gestionnaire' || role === 'admin' ? [{ key: 'sensors', label: 'Gestion Capteurs', icon: Settings }] : []),
+              { key: 'analytics', label: 'Analyses', icon: TrendingUp }
             ].map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -1006,7 +1071,7 @@ const Dashboard = () => {
                         </td>
                         {(role === 'gestionnaire' || role === 'admin') && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <SensorActionsMenu 
+                            <SensorActionsMenu
                               sensor={sensor}
                               onEdit={handleEditSensor}
                             />
@@ -1024,34 +1089,12 @@ const Dashboard = () => {
         {/* Vue Carte Interactive */}
         {currentView === 'map' && (
           <div className="space-y-6">
-            {/* Bouton d'ajout sur la carte */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-900">🗺️ Carte IoT connectée à la BDD</h3>
-                <div className="flex gap-2">
-                  {(role === 'gestionnaire' || role === 'admin') && (
-                    <button
-                      onClick={handleAddSensor}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                    >
-                      <Plus size={16} />
-                      Ajouter un capteur
-                    </button>
-                  )}
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded flex items-center gap-2 hover:bg-gray-200"
-                  >
-                    <RefreshCw size={16} />
-                    Recharger
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Composant carte principal */}
+            {/* Composant carte principal avec le bouton d'ajout intégré */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <ParisIoTMap />
+              <Map
+                onAddSensor={role === 'gestionnaire' || role === 'admin' ? handleAddSensor : undefined}
+                onSensorChange={handleSensorChange}
+              />
             </div>
 
             {/* Panneau d'informations complémentaires */}
@@ -1163,32 +1206,206 @@ const Dashboard = () => {
         {/* Vue Analytics */}
         {currentView === 'analytics' && (
           <div className="space-y-6">
+            {/* Header */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Analyses et Tendances</h3>
-              <p className="text-gray-600">Cette section sera bientôt disponible avec des graphiques et analyses avancées.</p>
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">📊 Analyses et Tendances en Temps Réel</h3>
+                  <p className="text-gray-600">Évolution des moyennes par type de capteur</p>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  Mise à jour automatique toutes les 30s
+                </div>
+              </div>
+            </div>
 
-              {/* Statistiques par type de capteur */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+            {/* Graphiques principaux */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Graphique Température */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Thermometer className="h-5 w-5 text-orange-500" />
+                  <h4 className="text-lg font-semibold text-gray-900">Température Moyenne</h4>
+                </div>
+                <div className="h-64 flex items-end justify-between gap-1 border-b border-l border-gray-200 pl-8 pb-8">
+                  {historicalData.slice(-10).map((data, index) => (
+                    <div key={index} className="flex flex-col items-center flex-1">
+                      <div
+                        className="bg-gradient-to-t from-orange-500 to-orange-300 rounded-t-md w-full transition-all duration-300"
+                        style={{
+                          height: `${Math.max(10, (data.temperature / 40) * 200)}px`
+                        }}
+                        title={`${data.temperature}°C à ${data.timestamp}`}
+                      ></div>
+                      <span className="text-xs text-gray-500 mt-1 transform -rotate-45 origin-left">
+                        {data.timestamp}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-center">
+                  <span className="text-2xl font-bold text-orange-600">
+                    {historicalData.length > 0 ? historicalData[historicalData.length - 1]?.temperature : '--'}°C
+                  </span>
+                  <span className="text-sm text-gray-500 ml-2">Moyenne actuelle</span>
+                </div>
+              </div>
+
+              {/* Graphique Qualité de l'air */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Wind className="h-5 w-5 text-blue-500" />
+                  <h4 className="text-lg font-semibold text-gray-900">Qualité de l'Air</h4>
+                </div>
+                <div className="h-64 flex items-end justify-between gap-1 border-b border-l border-gray-200 pl-8 pb-8">
+                  {historicalData.slice(-10).map((data, index) => (
+                    <div key={index} className="flex flex-col items-center flex-1">
+                      <div
+                        className="bg-gradient-to-t from-blue-500 to-blue-300 rounded-t-md w-full transition-all duration-300"
+                        style={{
+                          height: `${Math.max(10, (data.air_quality / 100) * 200)}px`
+                        }}
+                        title={`${data.air_quality} µg/m³ à ${data.timestamp}`}
+                      ></div>
+                      <span className="text-xs text-gray-500 mt-1 transform -rotate-45 origin-left">
+                        {data.timestamp}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-center">
+                  <span className="text-2xl font-bold text-blue-600">
+                    {historicalData.length > 0 ? historicalData[historicalData.length - 1]?.air_quality : '--'} µg/m³
+                  </span>
+                  <span className="text-sm text-gray-500 ml-2">Moyenne actuelle</span>
+                </div>
+              </div>
+
+              {/* Graphique Niveau sonore */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Volume2 className="h-5 w-5 text-purple-500" />
+                  <h4 className="text-lg font-semibold text-gray-900">Niveau Sonore</h4>
+                </div>
+                <div className="h-64 flex items-end justify-between gap-1 border-b border-l border-gray-200 pl-8 pb-8">
+                  {historicalData.slice(-10).map((data, index) => (
+                    <div key={index} className="flex flex-col items-center flex-1">
+                      <div
+                        className="bg-gradient-to-t from-purple-500 to-purple-300 rounded-t-md w-full transition-all duration-300"
+                        style={{
+                          height: `${Math.max(10, (data.noise / 100) * 200)}px`
+                        }}
+                        title={`${data.noise} dB à ${data.timestamp}`}
+                      ></div>
+                      <span className="text-xs text-gray-500 mt-1 transform -rotate-45 origin-left">
+                        {data.timestamp}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-center">
+                  <span className="text-2xl font-bold text-purple-600">
+                    {historicalData.length > 0 ? historicalData[historicalData.length - 1]?.noise : '--'} dB
+                  </span>
+                  <span className="text-sm text-gray-500 ml-2">Moyenne actuelle</span>
+                </div>
+              </div>
+
+              {/* Graphique Circulation */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Car className="h-5 w-5 text-green-500" />
+                  <h4 className="text-lg font-semibold text-gray-900">Circulation</h4>
+                </div>
+                <div className="h-64 flex items-end justify-between gap-1 border-b border-l border-gray-200 pl-8 pb-8">
+                  {historicalData.slice(-10).map((data, index) => (
+                    <div key={index} className="flex flex-col items-center flex-1">
+                      <div
+                        className="bg-gradient-to-t from-green-500 to-green-300 rounded-t-md w-full transition-all duration-300"
+                        style={{
+                          height: `${Math.max(10, (data.traffic / 500) * 200)}px`
+                        }}
+                        title={`${data.traffic} véh/h à ${data.timestamp}`}
+                      ></div>
+                      <span className="text-xs text-gray-500 mt-1 transform -rotate-45 origin-left">
+                        {data.timestamp}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 text-center">
+                  <span className="text-2xl font-bold text-green-600">
+                    {historicalData.length > 0 ? historicalData[historicalData.length - 1]?.traffic : '--'} véh/h
+                  </span>
+                  <span className="text-sm text-gray-500 ml-2">Moyenne actuelle</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Statistiques par type de capteur */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h4 className="text-lg font-semibold text-gray-900 mb-6">📈 Statistiques des Capteurs</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {['temperature', 'air_quality', 'noise', 'traffic', 'humidity', 'pollution'].map(type => {
                   const typeSensors = realSensors.filter(s => s.type === type);
+                  const currentData = sensorData.filter(s => s.type === type);
+                  const average = currentData.length > 0
+                    ? (currentData.reduce((acc, s) => acc + s.value, 0) / currentData.length).toFixed(1)
+                    : '0.0';
 
                   return (
-                    <div key={type} className="bg-gray-50 rounded-lg p-4">
-                      <div className="flex items-center mb-2">
+                    <div key={type} className="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                      <div className="flex items-center mb-3">
                         {getSensorIcon(type)}
                         <span className="ml-2 font-medium text-gray-900">
                           {getSensorLabel(type)}
                         </span>
                       </div>
-                      <div className="text-2xl font-bold text-gray-900">
-                        {typeSensors.length}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        capteurs installés
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Capteurs installés:</span>
+                          <span className="font-semibold text-gray-900">{typeSensors.length}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Moyenne actuelle:</span>
+                          <span className="font-semibold text-blue-600">
+                            {average} {currentData[0]?.unit || ''}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Capteurs actifs:</span>
+                          <span className="font-semibold text-green-600">
+                            {typeSensors.filter(s => s.status === 'actif').length}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Tendances et insights */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4">🔍 Insights Temps Réel</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <h5 className="font-medium text-gray-900 mb-2">État Global</h5>
+                  <div className="text-sm text-gray-600">
+                    <p>• {realSensors.filter(s => s.status === 'actif').length} capteurs actifs sur {realSensors.length}</p>
+                    <p>• {alerts.length} alertes critiques en cours</p>
+                    <p>• Données mises à jour il y a {Math.floor((Date.now() - lastUpdate.getTime()) / 1000)}s</p>
+                  </div>
+                </div>
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <h5 className="font-medium text-gray-900 mb-2">Prochaine Mise à Jour</h5>
+                  <div className="text-sm text-gray-600">
+                    <p>• Les graphiques se mettent à jour automatiquement</p>
+                    <p>• Nouvelles données toutes les 30 secondes</p>
+                    <p>• Historique conservé sur 20 points</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1261,7 +1478,7 @@ const Dashboard = () => {
                             {sensor.status === 'actif' ? 'Actif' :
                               sensor.status === 'maintenance' ? 'Maintenance' : 'Inactif'}
                           </span>
-                          <SensorActionsMenu 
+                          <SensorActionsMenu
                             sensor={sensor}
                             onEdit={handleEditSensor}
                           />
@@ -1270,7 +1487,7 @@ const Dashboard = () => {
                     </div>
                   ))}
                 </div>
-                
+
                 {realSensors.length > 10 && (
                   <div className="mt-4 text-center">
                     <button

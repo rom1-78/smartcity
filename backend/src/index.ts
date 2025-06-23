@@ -30,7 +30,7 @@ app.use('/api/suggestions', suggestionRoutes);
 // WebSocket pour les données temps réel (amélioré)
 io.on('connection', (socket) => {
   console.log('Client connecté:', socket.id);
-  
+
   // Simulation d'alertes temps réel
   const alertInterval = setInterval(() => {
     // Simuler une alerte occasionnelle

@@ -13,6 +13,7 @@ export interface Sensor {
   longitude?: number;
   status: 'actif' | 'inactif' | 'maintenance';
   installed_at: string;
+  last_update?: string
 }
 
 export interface SensorRequest {

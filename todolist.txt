@@ -1,3 +1,2 @@
-CRUD => modifier = mettre la date du jour et peut etre mettre un nouveau champ last_update avec le timestamp du dernier changement en valeur
 data des capteur en bdd
 stocker les alertes en bdd

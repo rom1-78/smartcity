@@ -14,7 +14,7 @@ export const registerUser = async (req: Request, res: Response) => {
     }
 
     // Hash du mot de passe
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     // Insertion dans la base
     await pool.query(

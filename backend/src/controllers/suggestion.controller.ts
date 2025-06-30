@@ -7,12 +7,12 @@ import { AuthRequest } from '../middleware/auth';
 // GET /api/suggestions - Récupérer toutes les suggestions
 export const getSuggestions = async (req: AuthRequest, res: Response) => {
   try {
-    const { 
-      limit = 20, 
-      offset = 0, 
-      category, 
+    const {
+      limit = 20,
+      offset = 0,
+      category,
       priority,
-      user_id 
+      user_id
     } = req.query;
 
     let query = `
@@ -51,11 +51,11 @@ export const getSuggestions = async (req: AuthRequest, res: Response) => {
     params.push(parseInt(limit as string), parseInt(offset as string));
 
     const [rows] = await db.execute<RowDataPacket[]>(query, params);
-    
+
     res.json(rows);
   } catch (error) {
     console.error('Erreur lors de la récupération des suggestions:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erreur interne du serveur',
       message: 'Impossible de récupérer les suggestions'
     });
@@ -66,9 +66,9 @@ export const getSuggestions = async (req: AuthRequest, res: Response) => {
 export const getSuggestionById = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    
+
     if (!id || isNaN(Number(id))) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'ID invalide',
         message: 'L\'ID de la suggestion doit être un nombre valide'
       });
@@ -87,20 +87,20 @@ export const getSuggestionById = async (req: AuthRequest, res: Response) => {
       query += ' AND s.user_id = ?';
       params.push(req.user?.id);
     }
-    
+
     const [rows] = await db.execute<RowDataPacket[]>(query, params);
-    
+
     if (rows.length === 0) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Suggestion non trouvée',
         message: `Aucune suggestion trouvée avec l'ID ${id} ou vous n'avez pas les permissions`
       });
     }
-    
+
     res.json(rows[0]);
   } catch (error) {
     console.error('Erreur lors de la récupération de la suggestion:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erreur interne du serveur',
       message: 'Impossible de récupérer la suggestion'
     });
@@ -110,64 +110,33 @@ export const getSuggestionById = async (req: AuthRequest, res: Response) => {
 // POST /api/suggestions - Créer une nouvelle suggestion
 export const createSuggestion = async (req: AuthRequest, res: Response) => {
   try {
-    const { 
-      title, 
-      message, 
-      category = 'other', 
-      priority = 'medium' 
-    } = req.body;
-    
-    // Validation des données obligatoires
-    if (!title || !message) {
-      return res.status(400).json({ 
-        error: 'Données manquantes',
-        message: 'Les champs title et message sont requis'
-      });
-    }
+    const { message } = req.body; // SEULEMENT message, pas title ni description
 
-    // Vérifier si la catégorie est valide
-    const validCategories = ['sensor', 'data_quality', 'new_feature', 'location', 'other'];
-    if (!validCategories.includes(category)) {
-      return res.status(400).json({ 
-        error: 'Catégorie invalide',
-        message: `La catégorie doit être l'une des suivantes: ${validCategories.join(', ')}`
-      });
-    }
-
-    // Vérifier si la priorité est valide
-    const validPriorities = ['low', 'medium', 'high'];
-    if (!validPriorities.includes(priority)) {
-      return res.status(400).json({ 
-        error: 'Priorité invalide',
-        message: 'La priorité doit être: low, medium ou high'
+    // Validation
+    if (!message || !message.trim()) {
+      return res.status(400).json({
+        error: 'Message requis',
+        message: 'Le champ message est obligatoire'
       });
     }
 
     const [result] = await db.execute<ResultSetHeader>(
-      `INSERT INTO suggestions (user_id, title, message, category, priority) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [req.user?.id, title, message, category, priority]
+      `INSERT INTO suggestions (user_id, message) VALUES (?, ?)`, // SEULEMENT user_id et message
+      [req.user?.id, message.trim()]
     );
-    
-    const newSuggestion = {
-      id: result.insertId,
-      user_id: req.user?.id,
-      title,
-      message,
-      category,
-      priority,
-      admin_response: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-    
+
     res.status(201).json({
       message: 'Suggestion créée avec succès',
-      suggestion: newSuggestion
+      suggestion: {
+        id: result.insertId,
+        user_id: req.user?.id,
+        message: message.trim(),
+        created_at: new Date().toISOString()
+      }
     });
   } catch (error) {
-    console.error('Erreur lors de la création de la suggestion:', error);
-    res.status(500).json({ 
+    console.error('Erreur création suggestion:', error);
+    res.status(500).json({
       error: 'Erreur interne du serveur',
       message: 'Impossible de créer la suggestion'
     });
@@ -179,16 +148,16 @@ export const addAdminResponse = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
     const { admin_response } = req.body;
-    
+
     if (!id || isNaN(Number(id))) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'ID invalide',
         message: 'L\'ID de la suggestion doit être un nombre valide'
       });
     }
 
     if (!admin_response) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Réponse manquante',
         message: 'Le champ admin_response est requis'
       });
@@ -196,7 +165,7 @@ export const addAdminResponse = async (req: AuthRequest, res: Response) => {
 
     // Vérifier que l'utilisateur est admin
     if (req.user?.role !== 'admin') {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Accès refusé',
         message: 'Seuls les administrateurs peuvent répondre aux suggestions'
       });
@@ -209,7 +178,7 @@ export const addAdminResponse = async (req: AuthRequest, res: Response) => {
     );
 
     if (existingRows.length === 0) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Suggestion non trouvée',
         message: `Aucune suggestion trouvée avec l'ID ${id}`
       });
@@ -219,7 +188,7 @@ export const addAdminResponse = async (req: AuthRequest, res: Response) => {
       'UPDATE suggestions SET admin_response = ?, updated_at = NOW() WHERE id = ?',
       [admin_response, id]
     );
-    
+
     res.json({
       message: 'Réponse ajoutée avec succès',
       suggestion_id: parseInt(id),
@@ -227,7 +196,7 @@ export const addAdminResponse = async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Erreur lors de l\'ajout de la réponse:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erreur interne du serveur',
       message: 'Impossible d\'ajouter la réponse'
     });
@@ -238,9 +207,9 @@ export const addAdminResponse = async (req: AuthRequest, res: Response) => {
 export const deleteSuggestion = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    
+
     if (!id || isNaN(Number(id))) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'ID invalide',
         message: 'L\'ID de la suggestion doit être un nombre valide'
       });
@@ -248,7 +217,7 @@ export const deleteSuggestion = async (req: AuthRequest, res: Response) => {
 
     // Vérifier que l'utilisateur est admin
     if (req.user?.role !== 'admin') {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Accès refusé',
         message: 'Seuls les administrateurs peuvent supprimer les suggestions'
       });
@@ -261,7 +230,7 @@ export const deleteSuggestion = async (req: AuthRequest, res: Response) => {
     );
 
     if (existingRows.length === 0) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Suggestion non trouvée',
         message: `Aucune suggestion trouvée avec l'ID ${id}`
       });
@@ -270,7 +239,7 @@ export const deleteSuggestion = async (req: AuthRequest, res: Response) => {
     const suggestionTitle = existingRows[0].title;
 
     await db.execute('DELETE FROM suggestions WHERE id = ?', [id]);
-    
+
     res.json({
       message: 'Suggestion supprimée avec succès',
       deleted_suggestion: {
@@ -280,7 +249,7 @@ export const deleteSuggestion = async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Erreur lors de la suppression de la suggestion:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erreur interne du serveur',
       message: 'Impossible de supprimer la suggestion'
     });

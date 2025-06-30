@@ -1,2 +1,4 @@
 data des capteur en bdd
 stocker les alertes en bdd
+formulaire d'ajout capteur passe sous la map ??
+les compte peuvent etre creer que par les admin 

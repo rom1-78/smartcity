@@ -18,12 +18,12 @@ interface Alert {
 // GET /api/alerts - Récupérer toutes les alertes
 export const getAlerts = async (req: AuthRequest, res: Response) => {
   try {
-    const { 
-      limit = 50, 
-      offset = 0, 
-      alert_type, 
+    const {
+      limit = 50,
+      offset = 0,
+      alert_type,
       resolved,
-      sensor_id 
+      sensor_id
     } = req.query;
 
     let query = `
@@ -59,11 +59,11 @@ export const getAlerts = async (req: AuthRequest, res: Response) => {
     params.push(parseInt(limit as string), parseInt(offset as string));
 
     const [rows] = await db.execute<RowDataPacket[]>(query, params);
-    
+
     res.json(rows);
   } catch (error) {
     console.error('Erreur lors de la récupération des alertes:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erreur interne du serveur',
       message: 'Impossible de récupérer les alertes'
     });
@@ -74,14 +74,14 @@ export const getAlerts = async (req: AuthRequest, res: Response) => {
 export const getAlertById = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    
+
     if (!id || isNaN(Number(id))) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'ID invalide',
         message: 'L\'ID de l\'alerte doit être un nombre valide'
       });
     }
-    
+
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT a.*, s.name as sensor_name, s.location as sensor_location 
        FROM alerts a 
@@ -89,18 +89,18 @@ export const getAlertById = async (req: AuthRequest, res: Response) => {
        WHERE a.id = ?`,
       [id]
     );
-    
+
     if (rows.length === 0) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Alerte non trouvée',
         message: `Aucune alerte trouvée avec l'ID ${id}`
       });
     }
-    
+
     res.json(rows[0]);
   } catch (error) {
     console.error('Erreur lors de la récupération de l\'alerte:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erreur interne du serveur',
       message: 'Impossible de récupérer l\'alerte'
     });
@@ -110,17 +110,17 @@ export const getAlertById = async (req: AuthRequest, res: Response) => {
 // POST /api/alerts - Créer une nouvelle alerte
 export const createAlert = async (req: AuthRequest, res: Response) => {
   try {
-    const { 
-      sensor_id, 
-      alert_type, 
-      seuil_value, 
-      current_value, 
-      message 
+    const {
+      sensor_id,
+      alert_type,
+      seuil_value,
+      current_value,
+      message
     } = req.body;
-    
+
     // Validation des données obligatoires
     if (!sensor_id || !alert_type || !seuil_value || !current_value || !message) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Données manquantes',
         message: 'Les champs sensor_id, alert_type, seuil_value, current_value et message sont requis'
       });
@@ -128,7 +128,7 @@ export const createAlert = async (req: AuthRequest, res: Response) => {
 
     // Vérifier si le type d'alerte est valide
     if (!['info', 'warning', 'critical'].includes(alert_type)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Type d\'alerte invalide',
         message: 'Le type d\'alerte doit être: info, warning ou critical'
       });
@@ -141,7 +141,7 @@ export const createAlert = async (req: AuthRequest, res: Response) => {
     );
 
     if (sensorRows.length === 0) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Capteur non trouvé',
         message: `Aucun capteur trouvé avec l'ID ${sensor_id}`
       });
@@ -152,7 +152,7 @@ export const createAlert = async (req: AuthRequest, res: Response) => {
        VALUES (?, ?, ?, ?, ?)`,
       [sensor_id, alert_type, seuil_value, current_value, message]
     );
-    
+
     const newAlert = {
       id: result.insertId,
       sensor_id,
@@ -163,14 +163,14 @@ export const createAlert = async (req: AuthRequest, res: Response) => {
       created_at: new Date().toISOString(),
       resolved_at: null
     };
-    
+
     res.status(201).json({
       message: 'Alerte créée avec succès',
       alert: newAlert
     });
   } catch (error) {
     console.error('Erreur lors de la création de l\'alerte:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erreur interne du serveur',
       message: 'Impossible de créer l\'alerte'
     });
@@ -181,9 +181,9 @@ export const createAlert = async (req: AuthRequest, res: Response) => {
 export const resolveAlert = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    
+
     if (!id || isNaN(Number(id))) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'ID invalide',
         message: 'L\'ID de l\'alerte doit être un nombre valide'
       });
@@ -196,14 +196,14 @@ export const resolveAlert = async (req: AuthRequest, res: Response) => {
     );
 
     if (existingRows.length === 0) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Alerte non trouvée',
         message: `Aucune alerte trouvée avec l'ID ${id}`
       });
     }
 
     if (existingRows[0].resolved_at) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Alerte déjà résolue',
         message: 'Cette alerte a déjà été marquée comme résolue'
       });
@@ -213,7 +213,7 @@ export const resolveAlert = async (req: AuthRequest, res: Response) => {
       'UPDATE alerts SET resolved_at = NOW() WHERE id = ?',
       [id]
     );
-    
+
     res.json({
       message: 'Alerte marquée comme résolue',
       alert_id: parseInt(id),
@@ -221,7 +221,7 @@ export const resolveAlert = async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Erreur lors de la résolution de l\'alerte:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erreur interne du serveur',
       message: 'Impossible de résoudre l\'alerte'
     });
@@ -232,9 +232,9 @@ export const resolveAlert = async (req: AuthRequest, res: Response) => {
 export const deleteAlert = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    
+
     if (!id || isNaN(Number(id))) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'ID invalide',
         message: 'L\'ID de l\'alerte doit être un nombre valide'
       });
@@ -247,21 +247,21 @@ export const deleteAlert = async (req: AuthRequest, res: Response) => {
     );
 
     if (existingRows.length === 0) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Alerte non trouvée',
         message: `Aucune alerte trouvée avec l'ID ${id}`
       });
     }
 
     await db.execute('DELETE FROM alerts WHERE id = ?', [id]);
-    
+
     res.json({
       message: 'Alerte supprimée avec succès',
       deleted_alert_id: parseInt(id)
     });
   } catch (error) {
     console.error('Erreur lors de la suppression de l\'alerte:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Erreur interne du serveur',
       message: 'Impossible de supprimer l\'alerte'
     });

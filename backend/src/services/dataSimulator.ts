@@ -14,7 +14,7 @@ class IoTDataSimulator {
     private isRunning = false;
 
     // Configuration des seuils par type de capteur
-    private thresholds = {
+    private seuils = {
         temperature: { min: 15, max: 35, warning: 25, critical: 30, unit: '°C' },
         air_quality: { min: 20, max: 200, warning: 100, critical: 150, unit: 'AQI' },
         noise: { min: 30, max: 80, warning: 60, critical: 70, unit: 'dB' },
@@ -64,7 +64,7 @@ class IoTDataSimulator {
 
     // Générer une valeur réaliste pour un capteur
     private generateValue(type: string, lastValue?: number): number {
-        const config = this.thresholds[type as keyof typeof this.thresholds];
+        const config = this.seuils[type as keyof typeof this.seuils];
         if (!config) return 0;
 
         const timePattern = this.getTimePattern(type);
@@ -90,7 +90,7 @@ class IoTDataSimulator {
     // Vérifier et créer des alertes si nécessaire
     private async checkAndCreateAlert(sensorId: number, value: number, sensorType: string, sensorName: string, location: string) {
         try {
-            const config = this.thresholds[sensorType as keyof typeof this.thresholds];
+            const config = this.seuils[sensorType as keyof typeof this.seuils];
             if (!config) return;
 
             let alertType: 'warning' | 'critical' | null = null;
@@ -141,7 +141,7 @@ class IoTDataSimulator {
 
             const lastValue = lastData.length > 0 ? lastData[0].value : undefined;
             const value = this.generateValue(sensor.type, lastValue);
-            const config = this.thresholds[sensor.type as keyof typeof this.thresholds];
+            const config = this.seuils[sensor.type as keyof typeof this.seuils];
 
             if (!config) {
                 console.warn(`Type de capteur inconnu: ${sensor.type}`);
@@ -183,7 +183,7 @@ class IoTDataSimulator {
             }
 
             this.isRunning = true;
-            console.log(`🚀 Démarrage du simulateur IoT pour ${sensors.length} capteurs`);
+            console.log(` Démarrage du simulateur IoT pour ${sensors.length} capteurs`);
             console.log(`⏱️ Intervalle: ${intervalSeconds} secondes`);
 
             // Créer des intervalles pour chaque capteur avec un léger décalage
@@ -218,7 +218,7 @@ class IoTDataSimulator {
             this.intervals.push(statusInterval);
 
         } catch (error) {
-            console.error('❌ Erreur lors du démarrage du simulateur:', error);
+            console.error(' Erreur lors du démarrage du simulateur:', error);
             this.isRunning = false;
         }
     }
@@ -241,7 +241,7 @@ class IoTDataSimulator {
         return {
             isRunning: this.isRunning,
             activeIntervals: this.intervals.length,
-            thresholds: this.thresholds
+            seuils: this.seuils
         };
     }
 
@@ -266,7 +266,7 @@ class IoTDataSimulator {
                 for (let i = totalPoints; i >= 0; i--) {
                     const timestamp = new Date(now.getTime() - (i * 30 * 60 * 1000)); // 30 minutes en arrière
                     const value = this.generateValue(sensor.type, lastValue);
-                    const config = this.thresholds[sensor.type as keyof typeof this.thresholds];
+                    const config = this.seuils[sensor.type as keyof typeof this.seuils];
 
                     if (config) {
                         await db.execute(
@@ -284,9 +284,9 @@ class IoTDataSimulator {
                 }
             }
 
-            console.log('✅ Génération de données historiques terminée');
+            console.log(' Génération de données historiques terminée');
         } catch (error) {
-            console.error('❌ Erreur génération données historiques:', error);
+            console.error(' Erreur génération données historiques:', error);
         }
     }
 
@@ -313,9 +313,9 @@ class IoTDataSimulator {
                 );
             }
 
-            console.log(`✅ ${testSensors.length} capteurs de test créés`);
+            console.log(` ${testSensors.length} capteurs de test créés`);
         } catch (error) {
-            console.error('❌ Erreur création capteurs de test:', error);
+            console.error(' Erreur création capteurs de test:', error);
         }
     }
 }

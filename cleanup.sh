@@ -3,17 +3,17 @@
 # 🧹 Script de nettoyage automatisé - Smart City IoT Project
 # Exécuter depuis la racine du projet
 
-echo "🚀 Début du nettoyage du projet Smart City IoT..."
+echo " Début du nettoyage du projet Smart City IoT..."
 
 # Phase 1: Suppression des fichiers redondants
 echo "📁 Phase 1: Suppression des fichiers redondants..."
 
 # Supprimer le fichier de route redondant
 if [ -f "backend/src/routes/sensorData.routes.ts" ]; then
-    echo "❌ Suppression de backend/src/routes/sensorData.routes.ts"
+    echo " Suppression de backend/src/routes/sensorData.routes.ts"
     rm "backend/src/routes/sensorData.routes.ts"
 else
-    echo "✅ backend/src/routes/sensorData.routes.ts déjà supprimé"
+    echo " backend/src/routes/sensorData.routes.ts déjà supprimé"
 fi
 
 # Phase 2: Nettoyage du package.json
@@ -115,7 +115,7 @@ export * from './sensor.types';
 export * from './api.types';
 EOF
 
-echo "✅ Fichiers de types créés dans frontend/src/types/"
+echo " Fichiers de types créés dans frontend/src/types/"
 
 # Phase 4: Nettoyage des imports et console.log
 echo "🧽 Phase 4: Nettoyage du code..."
@@ -125,7 +125,7 @@ cleanup_console_logs() {
     local file="$1"
     if [ -f "$file" ]; then
         # Supprimer uniquement les console.log avec emojis (debug)
-        sed -i.bak '/console\.log.*[🔄✅❌📊🔌]/d' "$file"
+        sed -i.bak '/console\.log.*[🔄❌📊🔌]/d' "$file"
         rm "${file}.bak" 2>/dev/null || true
         echo "🧹 Nettoyé: $file"
     fi

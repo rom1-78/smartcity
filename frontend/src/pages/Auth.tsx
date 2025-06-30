@@ -677,9 +677,9 @@ const Auth: React.FC = () => {
             <h4 className="text-sm font-medium text-yellow-800 mb-2">Comptes de démonstration :</h4>
             <div className="text-xs text-yellow-700 space-y-1">
               <p><strong>Admin:</strong> admin@techcity.fr / admin123</p>
-              <p><strong>Gestionnaire:</strong> gestionnaire@techcity.fr / gestionnaire123</p>
+              <p><strong>Gestionnaire:</strong> vrefagrtea@goma.com / azertyuiop</p>
               <p><strong>Chercheur:</strong> chercheur@techcity.fr / chercheur123</p>
-              <p><strong>Citoyen:</strong> citoyen@techcity.fr / citoyen123</p>
+              <p><strong>Citoyen:</strong> grezqg@gmail.com / azertyuiop</p>
             </div>
           </div>
         )}

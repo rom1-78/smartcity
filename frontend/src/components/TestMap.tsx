@@ -14,8 +14,8 @@ const TestMap: React.FC = () => {
   useEffect(() => {
     const initMap = async () => {
       try {
-        console.log('🚀 Test map init...');
-        
+        console.log(' Test map init...');
+
         // Charger CSS
         if (!document.querySelector('link[href*="leaflet"]')) {
           const link = document.createElement('link');
@@ -30,12 +30,12 @@ const TestMap: React.FC = () => {
           const script = document.createElement('script');
           script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
           document.head.appendChild(script);
-          
+
           await new Promise((resolve, reject) => {
             script.onload = resolve;
             script.onerror = reject;
           });
-          
+
           await new Promise(resolve => setTimeout(resolve, 500));
         }
 
@@ -49,7 +49,7 @@ const TestMap: React.FC = () => {
 
         // Créer carte simple
         const map = window.L.map(mapRef.current).setView([48.8566, 2.3522], 13);
-        
+
         window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© OpenStreetMap'
         }).addTo(map);
@@ -61,10 +61,10 @@ const TestMap: React.FC = () => {
           .openPopup();
 
         setLoaded(true);
-        console.log('✅ Carte test OK');
-        
+        console.log(' Carte test OK');
+
       } catch (err: any) {
-        console.error('❌ Erreur test:', err);
+        console.error(' Erreur test:', err);
         setError(err.message);
       }
     };
@@ -75,27 +75,27 @@ const TestMap: React.FC = () => {
   return (
     <div className="p-4">
       <h2 className="text-xl font-bold mb-4">Test Carte Leaflet</h2>
-      
+
       {error && (
         <div className="bg-red-100 text-red-700 p-3 rounded mb-4">
           Erreur: {error}
         </div>
       )}
-      
+
       {!loaded && !error && (
         <div className="bg-blue-100 text-blue-700 p-3 rounded mb-4">
           Chargement...
         </div>
       )}
-      
+
       {loaded && (
         <div className="bg-green-100 text-green-700 p-3 rounded mb-4">
-          ✅ Carte chargée avec succès!
+          Carte chargée avec succès!
         </div>
       )}
-      
-      <div 
-        ref={mapRef} 
+
+      <div
+        ref={mapRef}
         style={{
           height: '400px',
           width: '100%',

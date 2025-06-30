@@ -87,7 +87,7 @@ const Map: React.FC<MapProps> = ({ onAddSensor, onSensorChange }) => {
       } else if (response && Array.isArray(response.sensors)) {
         sensors = response.sensors;
       } else {
-        console.error('❌ Format de réponse invalide:', response);
+        console.error(' Format de réponse invalide:', response);
         throw new Error('Format de données invalide');
       }
 
@@ -101,7 +101,7 @@ const Map: React.FC<MapProps> = ({ onAddSensor, onSensorChange }) => {
 
       setSensors(validSensors);
       setError('');
-      console.log('✅ Capteurs valides chargés:', validSensors.length);
+      console.log(' Capteurs valides chargés:', validSensors.length);
 
       // Notifier le composant parent si nécessaire
       if (onSensorChange) {
@@ -109,7 +109,7 @@ const Map: React.FC<MapProps> = ({ onAddSensor, onSensorChange }) => {
       }
 
     } catch (err: any) {
-      console.error('❌ Erreur capteurs:', err);
+      console.error(' Erreur capteurs:', err);
       setError(`Erreur: ${err.message}`);
     }
   };
@@ -162,10 +162,10 @@ const Map: React.FC<MapProps> = ({ onAddSensor, onSensorChange }) => {
         measurements: dataToInsert
       });
 
-      console.log('✅ Données générées et insérées avec succès');
+      console.log(' Données générées et insérées avec succès');
 
     } catch (err: any) {
-      console.error('❌ Erreur génération données:', err);
+      console.error(' Erreur génération données:', err);
     }
   };
 
@@ -204,10 +204,10 @@ const Map: React.FC<MapProps> = ({ onAddSensor, onSensorChange }) => {
 
       const sensorData = response.data || response;
       setSelectedSensorData(Array.isArray(sensorData) ? sensorData : []);
-      console.log('✅ Données capteur chargées:', sensorData.length);
+      console.log(' Données capteur chargées:', sensorData.length);
 
     } catch (err: any) {
-      console.error('❌ Erreur données capteur:', err);
+      console.error(' Erreur données capteur:', err);
       setSelectedSensorData([]);
     } finally {
       setLoadingData(false);
@@ -218,7 +218,7 @@ const Map: React.FC<MapProps> = ({ onAddSensor, onSensorChange }) => {
   useEffect(() => {
     const initMap = async () => {
       try {
-        console.log('🚀 Init carte...');
+        console.log(' Init carte...');
 
         await loadSensors();
 
@@ -254,10 +254,10 @@ const Map: React.FC<MapProps> = ({ onAddSensor, onSensorChange }) => {
         }).addTo(map);
 
         mapInstanceRef.current = map;
-        console.log('✅ Carte créée');
+        console.log(' Carte créée');
 
       } catch (err: any) {
-        console.error('❌ Erreur init:', err);
+        console.error(' Erreur init:', err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -401,12 +401,12 @@ const Map: React.FC<MapProps> = ({ onAddSensor, onSensorChange }) => {
           dataDiv.innerHTML = html;
 
         } catch (err) {
-          dataDiv.innerHTML = '<div style="color: #dc2626;">❌ Erreur chargement données</div>';
+          dataDiv.innerHTML = '<div style="color: #dc2626;"> Erreur chargement données</div>';
         }
       });
     });
 
-    console.log('✅ Marqueurs ajoutés');
+    console.log(' Marqueurs ajoutés');
   }, [sensors, selectedSensorData]);
 
   // Stats
@@ -435,34 +435,13 @@ const Map: React.FC<MapProps> = ({ onAddSensor, onSensorChange }) => {
               </button>
             )}
 
-            {/* Bouton Génération données */}
-            {(role === 'gestionnaire' || role === 'admin') && (
-              <button
-                onClick={toggleDataGeneration}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${dataGenerationActive
-                    ? 'bg-red-600 text-white hover:bg-red-700'
-                    : 'bg-green-600 text-white hover:bg-green-700'
-                  }`}
-              >
-                <div className={`w-2 h-2 rounded-full ${dataGenerationActive ? 'bg-white animate-pulse' : 'bg-white'}`}></div>
-                {dataGenerationActive ? 'Arrêter données' : 'Générer données'}
-              </button>
-            )}
-
-            {/* Bouton Recharger */}
-            <button
-              onClick={() => window.location.reload()}
-              className="px-3 py-2 bg-gray-600 text-white rounded-lg flex items-center gap-2 hover:bg-gray-700 transition-colors"
-            >
-              <RefreshCw size={16} />
-              Recharger
-            </button>
+            
           </div>
         </div>
 
         {error && (
           <div className="bg-red-100 text-red-700 p-3 rounded mb-4">
-            ❌ {error}
+            {error}
           </div>
         )}
 

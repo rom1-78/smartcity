@@ -42,9 +42,14 @@ const Navbar: React.FC = () => {
                     <button onClick={handleHome} className="text-indigo-600 px-3 py-2 text-sm font-medium">
                         Accueil
                     </button>
-                    <button onClick={handleViewPublicData} className="text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium">
-                        Données
-                    </button>
+                    {logged && (
+                        <button 
+                            onClick={handleDashboard} 
+                            className="text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium"
+                        >
+                            Dashboard
+                        </button>
+                    )}
                     <button 
                         onClick={() => handleNavigateToTab('map')} 
                         className="text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium"
@@ -57,14 +62,7 @@ const Navbar: React.FC = () => {
                     >
                         Rapports
                     </button>
-                    {logged && (
-                        <button 
-                            onClick={handleDashboard} 
-                            className="text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium"
-                        >
-                            Dashboard
-                        </button>
-                    )}
+                    
                     <button className="text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium">
                         À propos
                     </button>

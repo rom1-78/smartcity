@@ -1,9 +1,10 @@
-// backend/src/controllers/sensor.controller.ts (VERSION CORRIGÉE)
+// backend/src/controllers/sensor.controller.ts - VERSION FINALE CORRIGÉE
 import { Response } from 'express';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import db from '../services/db';
 import { AuthRequest } from '../middleware/auth';
 
+// INTERFACES CORRIGÉES - correspondent à votre structure de BDD
 interface Sensor {
   id: number;
   name: string;
@@ -13,10 +14,6 @@ interface Sensor {
   installed_at: string;
   latitude?: number;
   longitude?: number;
-  serial_number?: string;
-  manufacturer?: string;
-  model?: string;
-  firmware_version?: string;
 }
 
 interface SensorRequest {
@@ -27,23 +24,17 @@ interface SensorRequest {
   installed_at: string;
   latitude?: number;
   longitude?: number;
-  serial_number?: string;
-  manufacturer?: string;
-  model?: string;
-  firmware_version?: string;
 }
 
 // GET /api/sensors - Récupérer tous les capteurs
 export const getSensors = async (req: AuthRequest, res: Response) => {
   try {
-
     const [rows] = await db.execute<RowDataPacket[]>(
       'SELECT * FROM sensors ORDER BY id DESC'
     );
-
     res.json(rows);
   } catch (error) {
-    console.error(' Erreur lors de la récupération des capteurs:', error);
+    console.error('❌ Erreur lors de la récupération des capteurs:', error);
     res.status(500).json({
       error: 'Erreur interne du serveur',
       message: 'Impossible de récupérer les capteurs',
@@ -86,88 +77,13 @@ export const getSensorById = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// GET /api/sensors/:id/data - Récupérer les données d'un capteur
-export const getSensorData = async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const {
-      limit = '50',
-      offset = '0',
-      start_date,
-      end_date
-    } = req.query;
-
-    if (!id || isNaN(Number(id))) {
-      return res.status(400).json({
-        error: 'ID invalide',
-        message: 'L\'ID du capteur doit être un nombre valide'
-      });
-    }
-
-    // Vérifier que le capteur existe
-    const [sensorRows] = await db.execute<RowDataPacket[]>(
-      'SELECT id FROM sensors WHERE id = ?',
-      [id]
-    );
-
-    if (sensorRows.length === 0) {
-      return res.status(404).json({
-        error: 'Capteur non trouvé',
-        message: `Aucun capteur trouvé avec l'ID ${id}`
-      });
-    }
-
-    let query = 'SELECT * FROM sensor_data WHERE sensor_id = ?';
-    const params: any[] = [id];
-
-    // Ajouter les filtres de date si fournis
-    if (start_date) {
-      query += ' AND timestamp >= ?';
-      params.push(start_date);
-    }
-    if (end_date) {
-      query += ' AND timestamp <= ?';
-      params.push(end_date);
-    }
-
-    query += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?';
-
-    // 🔧 CORRECTION: Convertir explicitement en nombre
-    const limitNum = parseInt(limit as string, 10);
-    const offsetNum = parseInt(offset as string, 10);
-
-    // Vérifier que les conversions sont valides
-    if (isNaN(limitNum) || isNaN(offsetNum)) {
-      return res.status(400).json({
-        error: 'Paramètres invalides',
-        message: 'Limit et offset doivent être des nombres valides'
-      });
-    }
-
-    params.push(limitNum, offsetNum);
-
-    const [dataRows] = await db.execute<RowDataPacket[]>(query, params);
-
-    res.json({
-      data: dataRows,
-      pagination: {
-        limit: limitNum,
-        offset: offsetNum,
-        total: dataRows.length
-      }
-    });
-  } catch (error) {
-    console.error('Erreur lors de la récupération des données du capteur:', error);
-    res.status(500).json({
-      error: 'Erreur interne du serveur',
-      message: 'Impossible de récupérer les données du capteur'
-    });
-  }
-};
-
-// POST /api/sensors - Créer un nouveau capteur
+// POST /api/sensors - Créer un nouveau capteur (VERSION CORRIGÉE FINALE)
 export const createSensor = async (req: AuthRequest, res: Response) => {
   try {
+    console.log('=== DÉBUT CRÉATION CAPTEUR ===');
+    console.log('🔍 Body reçu:', JSON.stringify(req.body, null, 2));
+
+    // DESTRUCTURATION CORRIGÉE - seulement les champs existants
     const {
       name,
       type,
@@ -175,103 +91,141 @@ export const createSensor = async (req: AuthRequest, res: Response) => {
       status,
       installed_at,
       latitude,
-      longitude,
-      serial_number,
-      manufacturer,
-      model,
-      firmware_version
+      longitude
     }: SensorRequest = req.body;
 
+    console.log(' Données extraites:', {
+      name: name || 'MANQUANT',
+      type: type || 'MANQUANT',
+      location: location || 'MANQUANT',
+      status: status || 'MANQUANT',
+      installed_at: installed_at || 'MANQUANT',
+      latitude,
+      longitude
+    });
+
     // Validation des données obligatoires
-    if (!name || !type || !location || !status || !installed_at) {
+    if (!name || !type || !location || !status) {
+      console.log(' Validation échouée - champs manquants');
       return res.status(400).json({
         error: 'Données manquantes',
-        message: 'Les champs name, type, location, status et installed_at sont requis'
+        message: 'Les champs name, type, location, status et installed_at sont requis',
+        received: { name, type, location, status, installed_at }
       });
     }
+
+    console.log(' Validation des champs obligatoires réussie');
 
     // Vérifier si le type est valide
     const validTypes = ['temperature', 'air_quality', 'noise', 'humidity', 'traffic', 'pollution'];
     if (!validTypes.includes(type)) {
+      console.log(` Type invalide: ${type}`);
       return res.status(400).json({
         error: 'Type invalide',
-        message: `Le type doit être l'un des suivants: ${validTypes.join(', ')}`
+        message: `Le type doit être l'un des suivants: ${validTypes.join(', ')}`,
+        received: type
       });
     }
+
+    console.log('✅ Validation du type réussie');
 
     // Vérifier si le statut est valide
     const validStatuses = ['actif', 'inactif', 'maintenance'];
     if (!validStatuses.includes(status)) {
+      console.log(`❌ Statut invalide: ${status}`);
       return res.status(400).json({
         error: 'Statut invalide',
-        message: 'Le statut doit être: actif, inactif ou maintenance'
+        message: 'Le statut doit être: actif, inactif ou maintenance',
+        received: status
       });
     }
 
+    console.log('✅ Validation du statut réussie');
+
     // Vérifier si un capteur avec le même nom existe déjà
+    console.log('🔍 Vérification nom unique...');
     const [existingRows] = await db.execute<RowDataPacket[]>(
       'SELECT id FROM sensors WHERE name = ?',
       [name]
     );
 
     if (existingRows.length > 0) {
+      console.log(`❌ Nom déjà existant: ${name}`);
       return res.status(409).json({
         error: 'Nom de capteur existant',
-        message: 'Un capteur avec ce nom existe déjà'
+        message: 'Un capteur avec ce nom existe déjà',
+        existing_id: existingRows[0].id
       });
     }
 
-    // Vérifier le numéro de série s'il est fourni
-    if (serial_number) {
-      const [serialRows] = await db.execute<RowDataPacket[]>(
-        'SELECT id FROM sensors WHERE serial_number = ?',
-        [serial_number]
-      );
+    console.log('✅ Nom unique validé');
 
-      if (serialRows.length > 0) {
-        return res.status(409).json({
-          error: 'Numéro de série existant',
-          message: 'Un capteur avec ce numéro de série existe déjà'
-        });
-      }
-    }
+    // Préparer les valeurs pour l'insertion
+    const insertValues = [
+      name,
+      type,
+      location,
+      latitude || null,
+      longitude || null,
+      status,
+      installed_at
+    ];
+
+    console.log('📝 Valeurs pour insertion:', insertValues);
 
     // Insérer le nouveau capteur
+    console.log('💾 Insertion en base de données...');
     const [result] = await db.execute<ResultSetHeader>(
       `INSERT INTO sensors 
-        (name, type, location, status, installed_at, latitude, longitude, 
-         serial_number, manufacturer, model, firmware_version) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        name, type, location, status, installed_at,
-        latitude || null, longitude || null, serial_number || null,
-        manufacturer || null, model || null, firmware_version || null
-      ]
+        (name, type, location, latitude, longitude, status, installed_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      insertValues
     );
 
+    console.log('✅ Insertion réussie, ID:', result.insertId);
+
     // Récupérer le capteur créé
+    console.log('🔍 Récupération du capteur créé...');
     const [newSensorRows] = await db.execute<RowDataPacket[]>(
       'SELECT * FROM sensors WHERE id = ?',
       [result.insertId]
     );
 
-    res.status(201).json({
+    console.log('✅ Capteur récupéré:', newSensorRows[0]);
+
+    const response = {
       message: 'Capteur créé avec succès',
       sensor: newSensorRows[0]
-    });
+    };
+
+    console.log('📤 Réponse envoyée:', response);
+    console.log('=== FIN CRÉATION CAPTEUR SUCCÈS ===');
+
+    res.status(201).json(response);
+
   } catch (error) {
-    console.error('Erreur lors de la création du capteur:', error);
+    console.log('=== ERREUR CRÉATION CAPTEUR ===');
+    console.error('❌ Erreur complète:', error);
+    console.error('❌ Message:', error instanceof Error ? error.message : 'Erreur inconnue');
+
     res.status(500).json({
       error: 'Erreur interne du serveur',
-      message: 'Impossible de créer le capteur'
+      message: 'Impossible de créer le capteur',
+      details: process.env.NODE_ENV === 'development' ? {
+        message: error instanceof Error ? error.message : 'Erreur inconnue',
+        stack: error instanceof Error ? error.stack : 'Pas de stack'
+      } : undefined
     });
+    console.log('=== FIN ERREUR CRÉATION CAPTEUR ===');
   }
 };
 
-// PUT /api/sensors/:id - Mettre à jour un capteur
+// PUT /api/sensors/:id - Mettre à jour un capteur (VERSION CORRIGÉE)
 export const updateSensor = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+
+    // DESTRUCTURATION CORRIGÉE - seulement les champs existants
     const {
       name,
       type,
@@ -279,11 +233,7 @@ export const updateSensor = async (req: AuthRequest, res: Response) => {
       status,
       installed_at,
       latitude,
-      longitude,
-      serial_number,
-      manufacturer,
-      model,
-      firmware_version
+      longitude
     }: SensorRequest = req.body;
 
     if (!id || isNaN(Number(id))) {
@@ -294,7 +244,7 @@ export const updateSensor = async (req: AuthRequest, res: Response) => {
     }
 
     // Validation des données obligatoires
-    if (!name || !type || !location || !status || !installed_at) {
+    if (!name || !type || !location || !status) {
       return res.status(400).json({
         error: 'Données manquantes',
         message: 'Tous les champs obligatoires sont requis'
@@ -345,32 +295,15 @@ export const updateSensor = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Vérifier le numéro de série s'il est fourni
-    if (serial_number) {
-      const [serialRows] = await db.execute<RowDataPacket[]>(
-        'SELECT id FROM sensors WHERE serial_number = ? AND id != ?',
-        [serial_number, id]
-      );
-
-      if (serialRows.length > 0) {
-        return res.status(409).json({
-          error: 'Numéro de série existant',
-          message: 'Un autre capteur avec ce numéro de série existe déjà'
-        });
-      }
-    }
-
-    // Mettre à jour le capteur
+    // Mettre à jour le capteur (REQUÊTE CORRIGÉE)
     await db.execute(
       `UPDATE sensors SET 
-        name = ?, type = ?, location = ?, status = ?, installed_at = ?,
-        latitude = ?, longitude = ?, serial_number = ?, manufacturer = ?, 
-        model = ?, firmware_version = ?
+      name = ?, type = ?, location = ?, latitude = ?, longitude = ?, 
+      status = ?
       WHERE id = ?`,
       [
-        name, type, location, status, installed_at,
-        latitude || null, longitude || null, serial_number || null,
-        manufacturer || null, model || null, firmware_version || null, id
+        name, type, location, latitude || null, longitude || null,
+        status, installed_at, id
       ]
     );
 
@@ -420,18 +353,6 @@ export const deleteSensor = async (req: AuthRequest, res: Response) => {
 
     const sensorName = existingRows[0].name;
 
-    // Vérifier s'il y a des données associées (optionnel)
-    let dataCount = 0;
-    try {
-      const [dataRows] = await db.execute<RowDataPacket[]>(
-        'SELECT COUNT(*) as count FROM sensor_data WHERE sensor_id = ?',
-        [id]
-      );
-      dataCount = dataRows[0].count;
-    } catch {
-      // Ignorer l'erreur si la table sensor_data n'existe pas
-    }
-
     // Supprimer le capteur
     await db.execute('DELETE FROM sensors WHERE id = ?', [id]);
 
@@ -439,8 +360,7 @@ export const deleteSensor = async (req: AuthRequest, res: Response) => {
       message: 'Capteur supprimé avec succès',
       sensor: {
         id: parseInt(id),
-        name: sensorName,
-        associated_data_count: dataCount
+        name: sensorName
       }
     });
   } catch (error) {
@@ -468,14 +388,8 @@ export const getSensorStats = async (req: AuthRequest, res: Response) => {
       'SELECT type, COUNT(*) as count FROM sensors GROUP BY type'
     );
 
-    // Capteurs récemment ajoutés (derniers 30 jours)
-    const [recentRows] = await db.execute<RowDataPacket[]>(
-      'SELECT COUNT(*) as count FROM sensors WHERE installed_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)'
-    );
-
     const stats = {
       total: totalRows[0].total,
-      recent_additions: recentRows[0].count,
       by_status: statusRows.reduce((acc: any, row: any) => {
         acc[row.status] = row.count;
         return acc;
@@ -492,138 +406,6 @@ export const getSensorStats = async (req: AuthRequest, res: Response) => {
     res.status(500).json({
       error: 'Erreur interne du serveur',
       message: 'Impossible de récupérer les statistiques'
-    });
-  }
-};
-
-// GET /api/sensors/search - Rechercher des capteurs
-export const searchSensors = async (req: AuthRequest, res: Response) => {
-  try {
-    const {
-      q,
-      type,
-      status,
-      location,
-      limit = '20',
-      offset = '0'
-    } = req.query;
-
-    let query = 'SELECT * FROM sensors WHERE 1=1';
-    const params: any[] = [];
-
-    // Recherche textuelle
-    if (q) {
-      query += ' AND (name LIKE ? OR location LIKE ? OR serial_number LIKE ?)';
-      const searchTerm = `%${q}%`;
-      params.push(searchTerm, searchTerm, searchTerm);
-    }
-
-    // Filtre par type
-    if (type) {
-      query += ' AND type = ?';
-      params.push(type);
-    }
-
-    // Filtre par statut
-    if (status) {
-      query += ' AND status = ?';
-      params.push(status);
-    }
-
-    // Filtre par localisation
-    if (location) {
-      query += ' AND location LIKE ?';
-      params.push(`%${location}%`);
-    }
-
-    query += ' ORDER BY id DESC LIMIT ? OFFSET ?';
-
-    // 🔧 CORRECTION: Convertir explicitement en nombre
-    const limitNum = parseInt(limit as string, 10);
-    const offsetNum = parseInt(offset as string, 10);
-
-    if (isNaN(limitNum) || isNaN(offsetNum)) {
-      return res.status(400).json({
-        error: 'Paramètres invalides',
-        message: 'Limit et offset doivent être des nombres valides'
-      });
-    }
-
-    params.push(limitNum, offsetNum);
-
-    const [rows] = await db.execute<RowDataPacket[]>(query, params);
-
-    res.json({
-      sensors: rows,
-      pagination: {
-        limit: limitNum,
-        offset: offsetNum,
-        total: rows.length
-      }
-    });
-  } catch (error) {
-    console.error('Erreur lors de la recherche de capteurs:', error);
-    res.status(500).json({
-      error: 'Erreur interne du serveur',
-      message: 'Impossible de rechercher les capteurs'
-    });
-  }
-};
-
-// POST /api/sensors/:id/data - Ajouter des données à un capteur
-export const addSensorData = async (req: AuthRequest, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { value, unit, timestamp } = req.body;
-
-    if (!id || isNaN(Number(id))) {
-      return res.status(400).json({
-        error: 'ID invalide',
-        message: 'L\'ID du capteur doit être un nombre valide'
-      });
-    }
-
-    if (value === undefined || value === null) {
-      return res.status(400).json({
-        error: 'Valeur manquante',
-        message: 'La valeur est requise'
-      });
-    }
-
-    // Vérifier que le capteur existe
-    const [sensorRows] = await db.execute<RowDataPacket[]>(
-      'SELECT id FROM sensors WHERE id = ?',
-      [id]
-    );
-
-    if (sensorRows.length === 0) {
-      return res.status(404).json({
-        error: 'Capteur non trouvé',
-        message: `Aucun capteur trouvé avec l'ID ${id}`
-      });
-    }
-
-    // Insérer les données
-    const [result] = await db.execute<ResultSetHeader>(
-      'INSERT INTO sensor_data (sensor_id, value, unit, timestamp) VALUES (?, ?, ?, ?)',
-      [id, value, unit || null, timestamp || new Date()]
-    );
-
-    res.status(201).json({
-      message: 'Données ajoutées avec succès',
-      data: {
-        id: result.insertId,
-        sensor_id: parseInt(id),
-        value,
-        unit,
-        timestamp: timestamp || new Date()
-      }
-    });
-  } catch (error) {
-    console.error('Erreur lors de l\'ajout des données:', error);
-    res.status(500).json({
-      error: 'Erreur interne du serveur',
-      message: 'Impossible d\'ajouter les données'
     });
   }
 };
